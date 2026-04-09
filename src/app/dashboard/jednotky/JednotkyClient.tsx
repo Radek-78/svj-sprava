@@ -13,6 +13,7 @@ type Jednotka = {
   podil_citatel: number
   podil_jmenovatel: number
   poznamka: string | null
+  katastr_url: string | null
   vlastnici: { je_aktivni: boolean; osoby: { jmeno: string | null; prijmeni: string } }[]
   najemnici: { je_aktivni: boolean }[]
 }
@@ -48,6 +49,7 @@ type EditForm = {
   podil_citatel: string
   podil_jmenovatel: string
   poznamka: string
+  katastr_url: string
 }
 
 type OsobaDetail = {
@@ -152,6 +154,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
       podil_citatel: j.podil_citatel.toString(),
       podil_jmenovatel: j.podil_jmenovatel.toString(),
       poznamka: j.poznamka ?? '',
+      katastr_url: j.katastr_url ?? '',
     })
     setEditChyba('')
     setEditMode(true)
@@ -169,6 +172,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
       podil_citatel: parseInt(editForm.podil_citatel),
       podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
       poznamka: editForm.poznamka || null,
+      katastr_url: editForm.katastr_url || null,
     }).eq('id', vybranaId)
     if (error) {
       setEditChyba('Chyba: ' + error.message)
@@ -188,6 +192,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
           podil_citatel: parseInt(editForm.podil_citatel),
           podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
           poznamka: editForm.poznamka || null,
+          katastr_url: editForm.katastr_url || null,
         }
       } : null)
     }
@@ -514,6 +519,17 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                   </div>
 
                   <div>
+                    <label className={labelCls}>Odkaz na katastr nemovitostí</label>
+                    <input
+                      type="url"
+                      value={editForm.katastr_url}
+                      onChange={e => setEditForm(p => ({ ...p, katastr_url: e.target.value }))}
+                      placeholder="https://nahlizeni.cuzk.cz/..."
+                      className={inputCls}
+                    />
+                  </div>
+
+                  <div>
                     <label className={labelCls}>Poznámka</label>
                     <textarea
                       value={editForm.poznamka}
@@ -561,6 +577,19 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                         </div>
                       ))}
                     </div>
+                    {detail.jednotka.katastr_url && (
+                      <a
+                        href={detail.jednotka.katastr_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 mt-3 bg-blue-50 rounded-xl px-4 py-3 ring-1 ring-blue-100 hover:ring-blue-300 transition-all group"
+                      >
+                        <svg className="w-4 h-4 text-blue-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                        </svg>
+                        <span className="text-sm text-blue-700 font-medium group-hover:underline">Nahlédnout do katastru</span>
+                      </a>
+                    )}
                     {detail.jednotka.poznamka && (
                       <p className="text-xs text-zinc-500 mt-3 bg-zinc-50 rounded-xl px-4 py-3">{detail.jednotka.poznamka}</p>
                     )}
