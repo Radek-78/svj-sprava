@@ -12,12 +12,14 @@ export default async function OsobyPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Osoby</h2>
-        <Link
-          href="/dashboard/osoby/nova"
-          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-        >
-          + Přidat osobu
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/osoby/import" className="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
+            Import z Excelu
+          </Link>
+          <Link href="/dashboard/osoby/nova" className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+            + Přidat osobu
+          </Link>
+        </div>
       </div>
 
       {(!osoby || osoby.length === 0) ? (
