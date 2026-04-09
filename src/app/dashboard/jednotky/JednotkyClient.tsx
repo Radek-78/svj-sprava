@@ -303,7 +303,8 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                     <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Podíl</th>
                     <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Vlastník</th>
                     <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Stav</th>
-                    <th className="px-4 py-3 w-8"></th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Poznámka</th>
+                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Katastr</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -335,6 +336,12 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                             : vl.length > 0
                               ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Vlastník</span>
                               : <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>Volné</span>
+                          }
+                        </td>
+                        <td className="px-4 py-2.5 max-w-[160px]">
+                          {j.poznamka
+                            ? <span title={j.poznamka} className="text-xs text-zinc-400 truncate block cursor-default">{j.poznamka}</span>
+                            : null
                           }
                         </td>
                         <td className="px-3 py-2.5">
