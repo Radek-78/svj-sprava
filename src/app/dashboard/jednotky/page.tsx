@@ -3,9 +3,14 @@ import Link from 'next/link'
 
 export default async function JednotkyPage() {
   const supabase = await createClient()
+
   const { data: jednotky } = await supabase
     .from('jednotky')
-    .select('*')
+    .select(`
+      *,
+      vlastnici!left(osoba_id, je_aktivni, osoby(jmeno, prijmeni)),
+      najemnici!left(je_aktivni)
+    `)
     .order('cislo_jednotky')
 
   return (
@@ -13,16 +18,10 @@ export default async function JednotkyPage() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Bytové jednotky</h2>
         <div className="flex gap-2">
-          <Link
-            href="/dashboard/jednotky/import"
-            className="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-          >
+          <Link href="/dashboard/jednotky/import" className="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium">
             Import z Excelu
           </Link>
-          <Link
-            href="/dashboard/jednotky/nova"
-            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-          >
+          <Link href="/dashboard/jednotky/nova" className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium">
             + Přidat jednotku
           </Link>
         </div>
@@ -31,15 +30,12 @@ export default async function JednotkyPage() {
       {(!jednotky || jednotky.length === 0) ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
           <p className="text-gray-500 text-sm">Zatím nejsou přidány žádné jednotky.</p>
-          <Link
-            href="/dashboard/jednotky/nova"
-            className="inline-block mt-4 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
+          <Link href="/dashboard/jednotky/nova" className="inline-block mt-4 bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
             Přidat první jednotku
           </Link>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
@@ -47,23 +43,52 @@ export default async function JednotkyPage() {
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Patro</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Výměra</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Podíl</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Vlastník</th>
+                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wide">Nájemník</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {jednotky.map(j => (
-                <tr key={j.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{j.cislo_jednotky}</td>
-                  <td className="px-4 py-3 text-gray-600">{j.patro ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-600">{j.vymera_m2} m²</td>
-                  <td className="px-4 py-3 text-gray-600">{j.podil_citatel}/{j.podil_jmenovatel}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link href={`/dashboard/jednotky/${j.id}`} className="text-blue-600 hover:text-blue-800 text-xs">
-                      Detail →
-                    </Link>
-                  </td>
-                </tr>
-              ))}
+              {jednotky.map(j => {
+                const aktivniVlastnici = (j.vlastnici ?? []).filter((v: {je_aktivni: boolean}) => v.je_aktivni)
+                const maNajemnika = (j.najemnici ?? []).some((n: {je_aktivni: boolean}) => n.je_aktivni)
+
+                return (
+                  <tr key={j.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-gray-900">{j.cislo_jednotky}</td>
+                    <td className="px-4 py-3 text-gray-500">{j.patro ?? '—'}</td>
+                    <td className="px-4 py-3 text-gray-600">{j.vymera_m2} m²</td>
+                    <td className="px-4 py-3 text-gray-500">{j.podil_citatel}/{j.podil_jmenovatel}</td>
+                    <td className="px-4 py-3">
+                      {aktivniVlastnici.length === 0 ? (
+                        <span className="text-gray-400 text-xs">Neuvedeno</span>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {aktivniVlastnici.map((v: {osoba_id: string, osoby: {jmeno: string, prijmeni: string}}, i: number) => (
+                            <div key={i} className="text-gray-900">{v.osoby.prijmeni} {v.osoby.jmeno}</div>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {maNajemnika ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
+                          Ano
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          Vlastník
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link href={`/dashboard/jednotky/${j.id}`} className="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                        Detail →
+                      </Link>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
