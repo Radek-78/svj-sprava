@@ -47,7 +47,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
         supabase.from('vlastnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId).eq('je_aktivni', true),
         supabase.from('najemnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId).eq('je_aktivni', true),
       ])
-      setDetail({ jednotka: jed, vlastnici: (vl ?? []) as Detail['vlastnici'], najemnici: (naj ?? []) as Detail['najemnici'] })
+      setDetail({ jednotka: jed, vlastnici: (vl ?? []) as unknown as Detail['vlastnici'], najemnici: (naj ?? []) as unknown as Detail['najemnici'] })
       setNacitaniDetail(false)
     }
     fetchDetail()
