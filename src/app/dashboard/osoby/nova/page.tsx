@@ -50,12 +50,12 @@ export default function NovaOsobaPage() {
       <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 space-y-5">
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className={labelClass}>Jméno *</label>
-            <input name="jmeno" value={form.jmeno} onChange={handleChange} required placeholder="Jan" className={inputClass} />
+            <label className={labelClass}>Jméno <span className="text-gray-400 font-normal">(nepovinné)</span></label>
+            <input name="jmeno" value={form.jmeno} onChange={handleChange} placeholder="Jan" className={inputClass} />
           </div>
           <div>
-            <label className={labelClass}>Příjmení *</label>
-            <input name="prijmeni" value={form.prijmeni} onChange={handleChange} required placeholder="Novák" className={inputClass} />
+            <label className={labelClass}>Příjmení / Název firmy *</label>
+            <input name="prijmeni" value={form.prijmeni} onChange={handleChange} required placeholder="Novák / s.r.o." className={inputClass} />
           </div>
         </div>
 

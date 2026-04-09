@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import DeleteOsobaButton from './DeleteOsobaButton'
 
 export default async function OsobaDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -10,22 +11,18 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
   if (!osoba) notFound()
 
   const { data: jednotkyVlastnik } = await supabase
-    .from('vlastnici')
-    .select('*, jednotky(*)')
-    .eq('osoba_id', id)
-    .eq('je_aktivni', true)
+    .from('vlastnici').select('*, jednotky(*)').eq('osoba_id', id).eq('je_aktivni', true)
 
   const { data: jednotkyNajemnik } = await supabase
-    .from('najemnici')
-    .select('*, jednotky(*)')
-    .eq('osoba_id', id)
-    .eq('je_aktivni', true)
+    .from('najemnici').select('*, jednotky(*)').eq('osoba_id', id).eq('je_aktivni', true)
+
+  const jmenoPlne = [osoba.jmeno, osoba.prijmeni].filter(Boolean).join(' ')
 
   return (
     <div className="p-8 max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/dashboard/osoby" className="text-sm text-gray-500 hover:text-gray-700">← Zpět</Link>
-        <h2 className="text-2xl font-bold text-gray-900">{osoba.jmeno} {osoba.prijmeni}</h2>
+        <h2 className="text-2xl font-bold text-gray-900">{jmenoPlne}</h2>
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-5">
@@ -34,9 +31,15 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
           <Link href={`/dashboard/osoby/${id}/upravit`} className="text-sm text-blue-600 hover:text-blue-800 font-medium">Upravit</Link>
         </div>
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+          {osoba.jmeno && (
+            <div>
+              <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Jméno</dt>
+              <dd className="mt-1 text-gray-900">{osoba.jmeno}</dd>
+            </div>
+          )}
           <div>
-            <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Jméno</dt>
-            <dd className="mt-1 text-gray-900">{osoba.jmeno} {osoba.prijmeni}</dd>
+            <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Příjmení / Název</dt>
+            <dd className="mt-1 text-gray-900">{osoba.prijmeni}</dd>
           </div>
           <div>
             <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">E-mail</dt>
@@ -46,7 +49,7 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
             <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Telefon</dt>
             <dd className="mt-1 text-gray-900">{osoba.telefon || '—'}</dd>
           </div>
-          <div>
+          <div className="col-span-2">
             <dt className="text-xs font-medium text-gray-500 uppercase tracking-wide">Adresa</dt>
             <dd className="mt-1 text-gray-900">
               {osoba.adresa_ulice ? (
@@ -63,7 +66,6 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
         </dl>
       </div>
 
-      {/* Jednotky jako vlastník */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-5">
         <h3 className="font-semibold text-gray-900 mb-4">Vlastník jednotky</h3>
         {(!jednotkyVlastnik || jednotkyVlastnik.length === 0) ? (
@@ -80,8 +82,7 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
         )}
       </div>
 
-      {/* Jednotky jako nájemník */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 mb-5">
         <h3 className="font-semibold text-gray-900 mb-4">Nájemník v jednotce</h3>
         {(!jednotkyNajemnik || jednotkyNajemnik.length === 0) ? (
           <p className="text-sm text-gray-400">Není nájemníkem žádné jednotky.</p>
@@ -95,6 +96,12 @@ export default async function OsobaDetailPage({ params }: { params: Promise<{ id
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="bg-white rounded-xl border border-red-100 shadow-sm p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">Nebezpečná zóna</h3>
+        <p className="text-sm text-gray-500 mb-4">Smazání osoby je nevratné.</p>
+        <DeleteOsobaButton id={id} jmeno={jmenoPlne} />
       </div>
     </div>
   )
