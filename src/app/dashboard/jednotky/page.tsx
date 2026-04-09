@@ -11,13 +11,21 @@ export default async function JednotkyPage() {
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Bytové jednotky</h2>
-        <Link
-          href="/dashboard/jednotky/nova"
-          className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          + Přidat jednotku
-        </Link>
+        <h2 className="text-2xl font-bold text-gray-900">Bytové jednotky</h2>
+        <div className="flex gap-2">
+          <Link
+            href="/dashboard/jednotky/import"
+            className="border border-gray-300 text-gray-700 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            Import z Excelu
+          </Link>
+          <Link
+            href="/dashboard/jednotky/nova"
+            className="bg-blue-600 text-white text-sm px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+          >
+            + Přidat jednotku
+          </Link>
+        </div>
       </div>
 
       {(!jednotky || jednotky.length === 0) ? (
