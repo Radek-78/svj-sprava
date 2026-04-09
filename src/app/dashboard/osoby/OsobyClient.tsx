@@ -45,8 +45,8 @@ export default function OsobyClient({ osoby }: { osoby: Osoba[] }) {
       ])
       setDetail({
         osoba,
-        jakoVlastnik: (vl ?? []) as Detail['jakoVlastnik'],
-        jakoNajemnik: (naj ?? []) as Detail['jakoNajemnik'],
+        jakoVlastnik: (vl ?? []) as unknown as Detail['jakoVlastnik'],
+        jakoNajemnik: (naj ?? []) as unknown as Detail['jakoNajemnik'],
       })
       setNacitani(false)
     }
