@@ -41,6 +41,15 @@ type Detail = {
   najemnici: Najemnik[]
 }
 
+type EditForm = {
+  cislo_jednotky: string
+  patro: string
+  vymera_m2: string
+  podil_citatel: string
+  podil_jmenovatel: string
+  poznamka: string
+}
+
 const dnesStr = new Date().toISOString().split('T')[0]
 
 export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
@@ -50,6 +59,13 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
   const [mazani, setMazani] = useState(false)
   const [potvrzeniSmazani, setPotvrzeniSmazani] = useState(false)
 
+  // Edit mode
+  const [editMode, setEditMode] = useState(false)
+  const [editForm, setEditForm] = useState<EditForm>({ cislo_jednotky: '', patro: '', vymera_m2: '', podil_citatel: '', podil_jmenovatel: '', poznamka: '' })
+  const [editChyba, setEditChyba] = useState('')
+  const [editUkladani, setEditUkladani] = useState(false)
+
+  // Add owner/tenant forms
   const [formVlastnik, setFormVlastnik] = useState(false)
   const [formNajemnik, setFormNajemnik] = useState(false)
   const [osoby, setOsoby] = useState<Osoba[]>([])
@@ -72,6 +88,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
     setPotvrzeniSmazani(false)
     setFormVlastnik(false)
     setFormNajemnik(false)
+    setEditMode(false)
 
     async function fetchDetail() {
       const jed = jednotky.find(j => j.id === vybranaId)!
@@ -86,6 +103,57 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
     }
     fetchDetail()
   }, [vybranaId])
+
+  function openEdit() {
+    if (!detail) return
+    const j = detail.jednotka
+    setEditForm({
+      cislo_jednotky: j.cislo_jednotky,
+      patro: j.patro?.toString() ?? '',
+      vymera_m2: j.vymera_m2.toString(),
+      podil_citatel: j.podil_citatel.toString(),
+      podil_jmenovatel: j.podil_jmenovatel.toString(),
+      poznamka: j.poznamka ?? '',
+    })
+    setEditChyba('')
+    setEditMode(true)
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!vybranaId) return
+    setEditUkladani(true)
+    setEditChyba('')
+    const { error } = await supabase.from('jednotky').update({
+      cislo_jednotky: editForm.cislo_jednotky,
+      patro: editForm.patro ? parseInt(editForm.patro) : null,
+      vymera_m2: parseFloat(editForm.vymera_m2),
+      podil_citatel: parseInt(editForm.podil_citatel),
+      podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
+      poznamka: editForm.poznamka || null,
+    }).eq('id', vybranaId)
+    if (error) {
+      setEditChyba('Chyba: ' + error.message)
+      setEditUkladani(false)
+    } else {
+      router.refresh()
+      setEditMode(false)
+      setEditUkladani(false)
+      // Aktualizuj detail lokálně
+      setDetail(prev => prev ? {
+        ...prev,
+        jednotka: {
+          ...prev.jednotka,
+          cislo_jednotky: editForm.cislo_jednotky,
+          patro: editForm.patro ? parseInt(editForm.patro) : null,
+          vymera_m2: parseFloat(editForm.vymera_m2),
+          podil_citatel: parseInt(editForm.podil_citatel),
+          podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
+          poznamka: editForm.poznamka || null,
+        }
+      } : null)
+    }
+  }
 
   async function refreshVlastnici() {
     const { data: vl } = await supabase.from('vlastnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId!).eq('je_aktivni', true)
@@ -133,6 +201,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
   }
 
   const inputCls = 'w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white'
+  const labelCls = 'block text-xs font-medium text-zinc-500 mb-1'
 
   return (
     <div className="flex h-full">
@@ -240,7 +309,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
 
       {/* Modal */}
       {vybranaId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setVybranaId(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setVybranaId(null); setEditMode(false) }}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
             className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-hidden flex flex-col"
@@ -249,11 +318,17 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
             {/* Modal hlavička */}
             <div className="bg-zinc-950 px-6 py-4 flex items-center justify-between flex-shrink-0">
               <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">Bytová jednotka</p>
+                {editMode && (
+                  <button onClick={() => setEditMode(false)} className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1 transition-colors">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    Zpět na detail
+                  </button>
+                )}
+                <p className="text-xs text-zinc-500 uppercase tracking-widest">{editMode ? 'Úprava' : 'Bytová jednotka'}</p>
                 <p className="text-2xl font-bold text-white">{detail?.jednotka.cislo_jednotky ?? '...'}</p>
               </div>
               <button
-                onClick={() => setVybranaId(null)}
+                onClick={() => { setVybranaId(null); setEditMode(false) }}
                 className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -268,7 +343,91 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                 <div className="flex items-center justify-center py-16">
                   <div className="w-7 h-7 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
                 </div>
+              ) : detail && editMode ? (
+                /* ── Edit formulář ── */
+                <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Číslo jednotky *</label>
+                      <input
+                        value={editForm.cislo_jednotky}
+                        onChange={e => setEditForm(p => ({ ...p, cislo_jednotky: e.target.value }))}
+                        required className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Patro</label>
+                      <input
+                        type="number"
+                        value={editForm.patro}
+                        onChange={e => setEditForm(p => ({ ...p, patro: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Výměra (m²) *</label>
+                    <input
+                      type="number" step="0.01"
+                      value={editForm.vymera_m2}
+                      onChange={e => setEditForm(p => ({ ...p, vymera_m2: e.target.value }))}
+                      required className={inputCls}
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Vlastnický podíl *</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={editForm.podil_citatel}
+                        onChange={e => setEditForm(p => ({ ...p, podil_citatel: e.target.value }))}
+                        required placeholder="čitatel" className={inputCls}
+                      />
+                      <span className="text-zinc-300 text-xl font-light flex-shrink-0">/</span>
+                      <input
+                        type="number"
+                        value={editForm.podil_jmenovatel}
+                        onChange={e => setEditForm(p => ({ ...p, podil_jmenovatel: e.target.value }))}
+                        required placeholder="jmenovatel" className={inputCls}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={labelCls}>Poznámka</label>
+                    <textarea
+                      value={editForm.poznamka}
+                      onChange={e => setEditForm(p => ({ ...p, poznamka: e.target.value }))}
+                      rows={3}
+                      className={inputCls + ' resize-none'}
+                    />
+                  </div>
+
+                  {editChyba && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{editChyba}</div>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button
+                      type="submit"
+                      disabled={editUkladani}
+                      className="flex-1 bg-violet-600 text-white text-sm py-2.5 rounded-xl hover:bg-violet-700 transition-colors font-medium disabled:opacity-50"
+                    >
+                      {editUkladani ? 'Ukládám...' : 'Uložit změny'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditMode(false)}
+                      className="flex-1 border border-zinc-300 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium"
+                    >
+                      Zrušit
+                    </button>
+                  </div>
+                </form>
               ) : detail && (
+                /* ── Detail pohled ── */
                 <div>
                   {/* Základní info */}
                   <div className="px-6 py-5 border-b border-zinc-100">
@@ -304,7 +463,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                     {formVlastnik && (
                       <div className="bg-violet-50 rounded-xl p-4 mb-3 border border-violet-100 space-y-3">
                         <div>
-                          <label className="text-xs font-medium text-zinc-600 mb-1 block">Vyberte osobu</label>
+                          <label className={labelCls}>Vyberte osobu</label>
                           <select value={osobaVlastnik} onChange={e => setOsobaVlastnik(e.target.value)} className={inputCls}>
                             <option value="">— vyberte osobu —</option>
                             {osoby.map(o => (
@@ -313,18 +472,16 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-zinc-600 mb-1 block">Vlastník od</label>
+                          <label className={labelCls}>Vlastník od</label>
                           <input type="date" value={datumVlastnik} onChange={e => setDatumVlastnik(e.target.value)} className={inputCls} />
                         </div>
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={handlePridatVlastnika}
-                            disabled={!osobaVlastnik || ukladani}
-                            className="flex-1 bg-violet-600 text-white text-sm py-2 rounded-lg hover:bg-violet-700 transition-colors font-medium disabled:opacity-40"
-                          >
-                            {ukladani ? 'Ukládám...' : 'Přiřadit vlastníka'}
-                          </button>
-                        </div>
+                        <button
+                          onClick={handlePridatVlastnika}
+                          disabled={!osobaVlastnik || ukladani}
+                          className="w-full bg-violet-600 text-white text-sm py-2 rounded-lg hover:bg-violet-700 transition-colors font-medium disabled:opacity-40"
+                        >
+                          {ukladani ? 'Ukládám...' : 'Přiřadit vlastníka'}
+                        </button>
                       </div>
                     )}
 
@@ -362,7 +519,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                     {formNajemnik && (
                       <div className="bg-amber-50 rounded-xl p-4 mb-3 border border-amber-100 space-y-3">
                         <div>
-                          <label className="text-xs font-medium text-zinc-600 mb-1 block">Vyberte osobu</label>
+                          <label className={labelCls}>Vyberte osobu</label>
                           <select value={osobaNajemnik} onChange={e => setOsobaNajemnik(e.target.value)} className={inputCls}>
                             <option value="">— vyberte osobu —</option>
                             {osoby.map(o => (
@@ -371,18 +528,16 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs font-medium text-zinc-600 mb-1 block">Nájemník od</label>
+                          <label className={labelCls}>Nájemník od</label>
                           <input type="date" value={datumNajemnik} onChange={e => setDatumNajemnik(e.target.value)} className={inputCls} />
                         </div>
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            onClick={handlePridatNajemnika}
-                            disabled={!osobaNajemnik || ukladani}
-                            className="flex-1 bg-amber-600 text-white text-sm py-2 rounded-lg hover:bg-amber-700 transition-colors font-medium disabled:opacity-40"
-                          >
-                            {ukladani ? 'Ukládám...' : 'Přiřadit nájemníka'}
-                          </button>
-                        </div>
+                        <button
+                          onClick={handlePridatNajemnika}
+                          disabled={!osobaNajemnik || ukladani}
+                          className="w-full bg-amber-600 text-white text-sm py-2 rounded-lg hover:bg-amber-700 transition-colors font-medium disabled:opacity-40"
+                        >
+                          {ukladani ? 'Ukládám...' : 'Přiřadit nájemníka'}
+                        </button>
                       </div>
                     )}
 
@@ -407,15 +562,15 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
 
                   {/* Akce */}
                   <div className="px-6 py-5 space-y-2">
-                    <Link
-                      href={`/dashboard/jednotky/${vybranaId}/upravit`}
+                    <button
+                      onClick={openEdit}
                       className="flex items-center justify-center gap-2 w-full border border-zinc-300 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                       Upravit jednotku
-                    </Link>
+                    </button>
 
                     {potvrzeniSmazani ? (
                       <div className="flex gap-2">
