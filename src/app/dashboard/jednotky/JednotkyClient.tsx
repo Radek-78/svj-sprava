@@ -50,6 +50,20 @@ type EditForm = {
   poznamka: string
 }
 
+type OsobaDetail = {
+  id: string
+  jmeno: string | null
+  prijmeni: string
+  email: string | null
+  telefon: string | null
+  adresa_ulice: string | null
+  adresa_mesto: string | null
+  adresa_psc: string | null
+  poznamka: string | null
+  jakoVlastnik: { id: string; jednotky: { id: string; cislo_jednotky: string } }[]
+  jakoNajemnik: { id: string; jednotky: { id: string; cislo_jednotky: string } }[]
+}
+
 const dnesStr = new Date().toISOString().split('T')[0]
 
 export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
@@ -64,6 +78,10 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
   const [editForm, setEditForm] = useState<EditForm>({ cislo_jednotky: '', patro: '', vymera_m2: '', podil_citatel: '', podil_jmenovatel: '', poznamka: '' })
   const [editChyba, setEditChyba] = useState('')
   const [editUkladani, setEditUkladani] = useState(false)
+
+  // Osoba view mode
+  const [osobaView, setOsobaView] = useState<OsobaDetail | null>(null)
+  const [nacitaniOsoby, setNacitaniOsoby] = useState(false)
 
   // Add owner/tenant forms
   const [formVlastnik, setFormVlastnik] = useState(false)
@@ -89,6 +107,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
     setFormVlastnik(false)
     setFormNajemnik(false)
     setEditMode(false)
+    setOsobaView(null)
 
     async function fetchDetail() {
       const jed = jednotky.find(j => j.id === vybranaId)!
@@ -103,6 +122,25 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
     }
     fetchDetail()
   }, [vybranaId])
+
+  async function openOsoba(osobaId: string) {
+    setNacitaniOsoby(true)
+    setOsobaView(null)
+    setEditMode(false)
+    const [{ data: o }, { data: vl }, { data: naj }] = await Promise.all([
+      supabase.from('osoby').select('*').eq('id', osobaId).single(),
+      supabase.from('vlastnici').select('id, jednotky(id, cislo_jednotky)').eq('osoba_id', osobaId).eq('je_aktivni', true),
+      supabase.from('najemnici').select('id, jednotky(id, cislo_jednotky)').eq('osoba_id', osobaId).eq('je_aktivni', true),
+    ])
+    if (o) {
+      setOsobaView({
+        ...o,
+        jakoVlastnik: (vl ?? []) as unknown as OsobaDetail['jakoVlastnik'],
+        jakoNajemnik: (naj ?? []) as unknown as OsobaDetail['jakoNajemnik'],
+      })
+    }
+    setNacitaniOsoby(false)
+  }
 
   function openEdit() {
     if (!detail) return
@@ -318,17 +356,26 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
             {/* Modal hlavička */}
             <div className="bg-zinc-950 px-6 py-4 flex items-center justify-between flex-shrink-0">
               <div>
-                {editMode && (
-                  <button onClick={() => setEditMode(false)} className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1 transition-colors">
+                {(editMode || osobaView) && (
+                  <button
+                    onClick={() => { setEditMode(false); setOsobaView(null) }}
+                    className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1 transition-colors"
+                  >
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                    Zpět na detail
+                    Zpět na detail jednotky
                   </button>
                 )}
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">{editMode ? 'Úprava' : 'Bytová jednotka'}</p>
-                <p className="text-2xl font-bold text-white">{detail?.jednotka.cislo_jednotky ?? '...'}</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-widest">
+                  {osobaView ? 'Osoba' : editMode ? 'Úprava' : 'Bytová jednotka'}
+                </p>
+                <p className="text-2xl font-bold text-white">
+                  {osobaView
+                    ? [osobaView.prijmeni, osobaView.jmeno].filter(Boolean).join(' ')
+                    : detail?.jednotka.cislo_jednotky ?? '...'}
+                </p>
               </div>
               <button
-                onClick={() => { setVybranaId(null); setEditMode(false) }}
+                onClick={() => { setVybranaId(null); setEditMode(false); setOsobaView(null) }}
                 className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -339,9 +386,80 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
 
             {/* Modal tělo */}
             <div className="flex-1 overflow-y-auto">
-              {nacitaniDetail ? (
+              {nacitaniDetail || nacitaniOsoby ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="w-7 h-7 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
+                </div>
+              ) : osobaView ? (
+                /* ── Pohled osoby ── */
+                <div>
+                  <div className="px-6 py-5 border-b border-zinc-100">
+                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
+                    <div className="space-y-2">
+                      {osobaView.email && (
+                        <div className="flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3">
+                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                          <span className="text-sm text-zinc-700">{osobaView.email}</span>
+                        </div>
+                      )}
+                      {osobaView.telefon && (
+                        <div className="flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3">
+                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                          </svg>
+                          <span className="text-sm text-zinc-700">{osobaView.telefon}</span>
+                        </div>
+                      )}
+                      {osobaView.adresa_ulice && (
+                        <div className="flex items-start gap-3 bg-zinc-50 rounded-xl px-4 py-3">
+                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          <div>
+                            <p className="text-sm text-zinc-700">{osobaView.adresa_ulice}</p>
+                            {osobaView.adresa_mesto && <p className="text-xs text-zinc-500 mt-0.5">{osobaView.adresa_psc} {osobaView.adresa_mesto}</p>}
+                          </div>
+                        </div>
+                      )}
+                      {!osobaView.email && !osobaView.telefon && !osobaView.adresa_ulice && (
+                        <p className="text-sm text-zinc-400 italic">Žádné kontaktní údaje</p>
+                      )}
+                    </div>
+                    {osobaView.poznamka && (
+                      <p className="text-xs text-zinc-500 mt-3 bg-zinc-50 rounded-xl px-4 py-3">{osobaView.poznamka}</p>
+                    )}
+                  </div>
+
+                  {osobaView.jakoVlastnik.length > 0 && (
+                    <div className="px-6 py-5 border-b border-zinc-100">
+                      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Vlastník jednotky</p>
+                      <div className="space-y-2">
+                        {osobaView.jakoVlastnik.map(v => (
+                          <div key={v.id} className="flex items-center justify-between bg-emerald-50 rounded-xl px-4 py-3 ring-1 ring-emerald-100">
+                            <span className="text-sm font-semibold text-zinc-900">Jednotka {v.jednotky.cislo_jednotky}</span>
+                            <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">vlastník</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {osobaView.jakoNajemnik.length > 0 && (
+                    <div className="px-6 py-5 border-b border-zinc-100">
+                      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Nájemník v jednotce</p>
+                      <div className="space-y-2">
+                        {osobaView.jakoNajemnik.map(n => (
+                          <div key={n.id} className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3 ring-1 ring-amber-100">
+                            <span className="text-sm font-semibold text-zinc-900">Jednotka {n.jednotky.cislo_jednotky}</span>
+                            <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">nájemník</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : detail && editMode ? (
                 /* ── Edit formulář ── */
@@ -497,7 +615,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                               {v.osoby.telefon && <p className="text-xs text-zinc-500">{v.osoby.telefon}</p>}
                               <p className="text-[10px] text-zinc-400 mt-1">od {v.datum_od}</p>
                             </div>
-                            <Link href={`/dashboard/osoby/${v.osoby.id}`} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</Link>
+                            <button onClick={() => openOsoba(v.osoby.id)} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</button>
                           </div>
                         ))}
                       </div>
@@ -553,7 +671,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
                               {n.osoby.telefon && <p className="text-xs text-zinc-500">{n.osoby.telefon}</p>}
                               <p className="text-[10px] text-zinc-400 mt-1">od {n.datum_od}</p>
                             </div>
-                            <Link href={`/dashboard/osoby/${n.osoby.id}`} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</Link>
+                            <button onClick={() => openOsoba(n.osoby.id)} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</button>
                           </div>
                         ))}
                       </div>
