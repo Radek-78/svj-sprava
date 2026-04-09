@@ -77,7 +77,7 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
 
   // Edit mode
   const [editMode, setEditMode] = useState(false)
-  const [editForm, setEditForm] = useState<EditForm>({ cislo_jednotky: '', patro: '', vymera_m2: '', podil_citatel: '', podil_jmenovatel: '', poznamka: '' })
+  const [editForm, setEditForm] = useState<EditForm>({ cislo_jednotky: '', patro: '', vymera_m2: '', podil_citatel: '', podil_jmenovatel: '', poznamka: '', katastr_url: '' })
   const [editChyba, setEditChyba] = useState('')
   const [editUkladani, setEditUkladani] = useState(false)
 
