@@ -88,7 +88,7 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 
 // ─── Komponenta ───────────────────────────────────────────────────────────────
 
-export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednotka[] }) {
+export default function JednotkyClient({ jednotky: initial, openId }: { jednotky: Jednotka[]; openId?: string }) {
   const [jednotky, setJednotky] = useState(initial)
   const [vybranaId, setVybranaId] = useState<string | null>(null)
   const [view, setView] = useState<ModalView>('detail')
@@ -120,6 +120,14 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
 
   const router = useRouter()
   const supabase = createClient()
+
+  // Otevřít modal přes URL parametr ?open=ID
+  useEffect(() => {
+    if (openId && jednotky.some(j => j.id === openId)) {
+      openModal(openId)
+      router.replace('/dashboard/jednotky')
+    }
+  }, [openId])
 
   const vybrana = jednotky.find(j => j.id === vybranaId) ?? null
 

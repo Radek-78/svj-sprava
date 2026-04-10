@@ -481,7 +481,11 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
                         {vybrana.jednotky_osoby
                           .sort((a, b) => Number(b.je_aktivni) - Number(a.je_aktivni))
                           .map(v => (
-                            <div key={v.id} className={`px-4 py-3 rounded-xl border transition-opacity ${v.je_aktivni ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-50'}`}>
+                            <div
+                              key={v.id}
+                              onClick={() => { closeModal(); router.push(`/dashboard/jednotky?open=${v.jednotky.id}`) }}
+                              className={`px-4 py-3 rounded-xl border transition-colors cursor-pointer ${v.je_aktivni ? 'border-zinc-200 bg-white hover:border-violet-200 hover:bg-violet-50' : 'border-zinc-100 bg-zinc-50 opacity-50 hover:opacity-70'}`}
+                            >
                               <div className="flex items-start justify-between">
                                 <div>
                                   <div className="flex items-center gap-2 flex-wrap">

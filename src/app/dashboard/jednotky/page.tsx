@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import JednotkyClient from './JednotkyClient'
 
-export default async function JednotkyPage() {
+export default async function JednotkyPage({ searchParams }: { searchParams: Promise<{ open?: string }> }) {
   const supabase = await createClient()
+  const { open } = await searchParams
 
   const { data: jednotky } = await supabase
     .from('jednotky')
@@ -17,7 +18,7 @@ export default async function JednotkyPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <JednotkyClient jednotky={jednotky ?? []} />
+      <JednotkyClient jednotky={jednotky ?? []} openId={open} />
     </div>
   )
 }
