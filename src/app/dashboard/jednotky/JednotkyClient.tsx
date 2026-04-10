@@ -271,6 +271,13 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
     router.refresh()
   }
 
+  // ── Smazat vazbu ──
+  async function handleSmazatVazbu(vazbaId: string) {
+    await supabase.from('jednotky_osoby').delete().eq('id', vazbaId)
+    await refreshJednotky()
+    router.refresh()
+  }
+
   // ── Smazat jednotku ──
   async function handleSmazat() {
     if (!vybranaId) return
@@ -464,7 +471,8 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                                 {aktivniVlastnici.map(v => (
                                   <div key={v.id} className="flex items-center justify-between mt-1">
                                     <span className="text-sm font-semibold text-zinc-900">{formatJmeno(v.osoby)}</span>
-                                    <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">ukončit</button>
+                                    <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700">ukončit</button>
+                                    <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
                                   </div>
                                 ))}
                               </div>
@@ -480,7 +488,8 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                                 </div>
                                 {v.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {v.datum_od}</p>}
                               </div>
-                              <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">ukončit</button>
+                              <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">ukončit</button>
+                              <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
                             </div>
                           ))
                         })()}
@@ -504,7 +513,8 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                               <p className="text-sm font-semibold text-zinc-900">{formatJmeno(n.osoby)}</p>
                               {n.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {n.datum_od}</p>}
                             </div>
-                            <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">ukončit</button>
+                            <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">ukončit</button>
+                            <button onClick={() => handleSmazatVazbu(n.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
                           </div>
                         ))}
                       </div>
@@ -524,7 +534,8 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                         {aktivniBydlici.map(b => (
                           <div key={b.id} className="bg-blue-50 rounded-xl px-3 py-2.5 ring-1 ring-blue-100 flex items-center justify-between">
                             <span className="text-sm font-semibold text-zinc-900">{formatJmeno(b.osoby)}</span>
-                            <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">odhlásit</button>
+                            <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">odhlásit</button>
+                            <button onClick={() => handleSmazatVazbu(b.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
                           </div>
                         ))}
                       </div>
