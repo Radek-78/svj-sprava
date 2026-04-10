@@ -398,7 +398,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
           onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
             onMouseDown={e => e.stopPropagation()}
           >
             {/* Modal hlavička */}
@@ -414,8 +414,15 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
                   {view === 'detail' ? 'Bytová jednotka' : view === 'edit' ? 'Úprava jednotky' : view === 'add-vlastnik' ? 'Přidat vlastníka' : view === 'add-najemnik' ? 'Přidat nájemníka' : 'Přidat osobu k pobytu'}
                 </p>
-                <p className="text-2xl font-bold text-white mt-0.5">{vybrana.cislo_jednotky}</p>
-                {vybrana.ulice_vchodu && <p className="text-xs text-zinc-500 mt-0.5">{vybrana.ulice_vchodu}</p>}
+                <div className="flex items-baseline gap-3 mt-0.5">
+                  <p className="text-2xl font-bold text-white">{vybrana.cislo_jednotky}</p>
+                  {vybrana.ulice_vchodu && <p className="text-sm text-zinc-400">{vybrana.ulice_vchodu}</p>}
+                  {vybrana.vchod && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/10 text-zinc-300 text-xs font-semibold">
+                      Vchod {vybrana.vchod}
+                    </span>
+                  )}
+                </div>
               </div>
               <button onClick={closeModal}
                 className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors mt-1">
@@ -424,55 +431,94 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
             </div>
 
             {/* Modal tělo */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-hidden flex flex-col">
 
-              {/* ── DETAIL ── */}
+              {/* ── DETAIL – dvoupanelový layout ── */}
               {view === 'detail' && (
-                <div>
-                  {/* Info dlaždice */}
-                  <div className="px-6 py-5 border-b border-zinc-100">
-                    <div className="grid grid-cols-5 gap-2">
-                      {[
-                        { l: 'Patro', v: vybrana.patro ?? '—' },
-                        { l: 'Plocha', v: vybrana.uzitna_plocha ? `${vybrana.uzitna_plocha} m²` : '—' },
-                        { l: 'Podíl', v: vybrana.podil_citatel ? `${vybrana.podil_citatel}/${vybrana.podil_jmenovatel}` : '—' },
-                        { l: 'Pokojů', v: vybrana.pocet_pokoju ?? '—' },
-                        { l: 'Var. symbol', v: vybrana.var_symbol ?? '—' },
-                      ].map(({ l, v }) => (
-                        <div key={l} className="bg-zinc-50 rounded-xl px-3 py-2.5">
-                          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{l}</p>
-                          <p className="text-sm font-semibold text-zinc-900 mt-0.5">{v}</p>
+                <div className="flex flex-1 overflow-hidden">
+
+                  {/* Levý panel – informace o jednotce */}
+                  <div className="w-64 flex-shrink-0 border-r border-zinc-100 flex flex-col overflow-y-auto">
+                    <div className="p-5 flex-1">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Informace o jednotce</p>
+                      <div className="space-y-0">
+                        {[
+                          { l: 'Patro', v: vybrana.patro != null ? String(vybrana.patro) : '—' },
+                          { l: 'Užitná plocha', v: vybrana.uzitna_plocha ? `${vybrana.uzitna_plocha} m²` : '—' },
+                          { l: 'Vlastnický podíl', v: vybrana.podil_citatel ? `${vybrana.podil_citatel}/${vybrana.podil_jmenovatel}` : '—' },
+                          { l: 'Počet pokojů', v: vybrana.pocet_pokoju != null ? String(vybrana.pocet_pokoju) : '—' },
+                          { l: 'Variabilní symbol', v: vybrana.var_symbol ?? '—' },
+                        ].map(({ l, v }) => (
+                          <div key={l} className="flex items-baseline justify-between py-2.5 border-b border-zinc-50 last:border-0">
+                            <span className="text-xs text-zinc-400 shrink-0 mr-2">{l}</span>
+                            <span className="text-sm font-semibold text-zinc-900 tabular-nums text-right">{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {vybrana.poznamka && (
+                        <div className="mt-4 bg-zinc-50 rounded-xl px-3 py-2.5">
+                          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Poznámka</p>
+                          <p className="text-xs text-zinc-600">{vybrana.poznamka}</p>
                         </div>
-                      ))}
+                      )}
                     </div>
-                    {vybrana.poznamka && <p className="mt-3 text-xs text-zinc-500 bg-zinc-50 rounded-xl px-3 py-2.5">{vybrana.poznamka}</p>}
+
+                    {/* Akce */}
+                    <div className="p-4 border-t border-zinc-100 space-y-2 flex-shrink-0">
+                      <button onClick={openEdit}
+                        className="flex items-center justify-center gap-2 w-full border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Upravit jednotku
+                      </button>
+                      {potvrzeni ? (
+                        <div className="flex gap-1.5">
+                          <button onClick={handleSmazat} disabled={mazani}
+                            className="flex-1 bg-red-600 text-white text-xs py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50">
+                            {mazani ? 'Mažu...' : 'Potvrdit smazání'}
+                          </button>
+                          <button onClick={() => setPotvrzeni(false)}
+                            className="flex-1 border border-zinc-200 text-zinc-600 text-xs py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
+                            Zrušit
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setPotvrzeni(true)}
+                          className="w-full border border-red-200 text-red-500 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium">
+                          Smazat jednotku
+                        </button>
+                      )}
+                    </div>
                   </div>
 
-                  {/* Vlastníci */}
-                  <div className="px-6 py-4 border-b border-zinc-100">
-                    <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Vlastnictví</p>
-                      <button onClick={openAddVlastnik} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
-                    </div>
-                    {aktivniVlastnici.length === 0 ? (
-                      <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {(() => {
-                          // Skupinové zobrazení SJM/MCP
-                          const typ = aktivniVlastnici[0].typ_vlastnictvi
-                          if (typ === 'sjm' || typ === 'mcp') {
-                            return (
-                              <div className="bg-zinc-50 rounded-xl p-3">
-                                <div className="flex items-center gap-2 mb-1">
-                                  {typVlastnictviBadge(typ)}
-                                  <span className="text-xs text-zinc-400">{aktivniVlastnici[0].datum_od ? `od ${aktivniVlastnici[0].datum_od}` : ''}</span>
+                  {/* Pravý panel – osoby */}
+                  <div className="flex-1 overflow-y-auto">
+
+                    {/* Vlastníci */}
+                    <div className="px-6 py-4 border-b border-zinc-100">
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Vlastnictví</p>
+                        <button onClick={openAddVlastnik} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
+                      </div>
+                      {aktivniVlastnici.length === 0 ? (
+                        <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {(() => {
+                            const typ = aktivniVlastnici[0].typ_vlastnictvi
+                            if (typ === 'sjm' || typ === 'mcp') {
+                              return (
+                                <div className="bg-zinc-50 rounded-xl p-3">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {typVlastnictviBadge(typ)}
+                                    <span className="text-xs text-zinc-400">{aktivniVlastnici[0].datum_od ? `od ${aktivniVlastnici[0].datum_od}` : ''}</span>
                                 </div>
                                 {aktivniVlastnici.map(v => (
                                   <div key={v.id} className="flex items-center justify-between mt-1">
                                     <span className="text-sm font-semibold text-zinc-900">{formatJmeno(v.osoby)}</span>
-                                    <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700">ukončit</button>
-                                    <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                      <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700">ukončit</button>
+                                      <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -488,8 +534,10 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                                 </div>
                                 {v.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {v.datum_od}</p>}
                               </div>
-                              <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">ukončit</button>
-                              <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
+                              <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                                <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-amber-500 hover:text-amber-700">ukončit</button>
+                                <button onClick={() => handleSmazatVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
+                              </div>
                             </div>
                           ))
                         })()}
@@ -513,8 +561,10 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                               <p className="text-sm font-semibold text-zinc-900">{formatJmeno(n.osoby)}</p>
                               {n.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {n.datum_od}</p>}
                             </div>
-                            <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">ukončit</button>
-                            <button onClick={() => handleSmazatVazbu(n.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[10px] text-amber-500 hover:text-amber-700">ukončit</button>
+                              <button onClick={() => handleSmazatVazbu(n.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -534,44 +584,23 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                         {aktivniBydlici.map(b => (
                           <div key={b.id} className="bg-blue-50 rounded-xl px-3 py-2.5 ring-1 ring-blue-100 flex items-center justify-between">
                             <span className="text-sm font-semibold text-zinc-900">{formatJmeno(b.osoby)}</span>
-                            <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[10px] text-amber-500 hover:text-amber-700 flex-shrink-0 ml-1">odhlásit</button>
-                            <button onClick={() => handleSmazatVazbu(b.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0">smazat</button>
+                            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                              <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[10px] text-amber-500 hover:text-amber-700">odhlásit</button>
+                              <button onClick={() => handleSmazatVazbu(b.id)} className="text-[10px] text-red-400 hover:text-red-600">smazat</button>
+                            </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Akce */}
-                  <div className="px-6 py-5 space-y-2">
-                    <button onClick={openEdit}
-                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      Upravit jednotku
-                    </button>
-                    {potvrzeni ? (
-                      <div className="flex gap-2">
-                        <button onClick={handleSmazat} disabled={mazani}
-                          className="flex-1 bg-red-600 text-white text-sm py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50">
-                          {mazani ? 'Mažu...' : 'Potvrdit smazání'}
-                        </button>
-                        <button onClick={() => setPotvrzeni(false)}
-                          className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
-                          Zrušit
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => setPotvrzeni(true)}
-                        className="w-full border border-red-200 text-red-500 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium">
-                        Smazat jednotku
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  </div>{/* konec pravého panelu */}
+                </div>{/* konec dvoupanelového layoutu */}
               )}
 
               {/* ── EDIT ── */}
               {view === 'edit' && (
+                <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
                   <div className="grid grid-cols-3 gap-3">
                     <div>
@@ -640,10 +669,12 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                     </button>
                   </div>
                 </form>
+                </div>
               )}
 
               {/* ── ADD VLASTNÍK ── */}
               {view === 'add-vlastnik' && (
+                <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleAddVlastnik} className="px-6 py-5 space-y-4">
                   <div>
                     <label className={LABEL}>Typ vlastnictví</label>
@@ -715,10 +746,12 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
                   </div>
                 </form>
+                </div>
               )}
 
               {/* ── ADD NÁJEMNÍK / BYDLÍCÍ ── */}
               {(view === 'add-najemnik' || view === 'add-bydlici') && (
+                <div className="flex-1 overflow-y-auto">
                 <div className="px-6 py-5 space-y-4">
                   <div>
                     <label className={LABEL}>Osoba</label>
@@ -741,6 +774,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                     <button onClick={() => setView('detail')}
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
                   </div>
+                </div>
                 </div>
               )}
 
