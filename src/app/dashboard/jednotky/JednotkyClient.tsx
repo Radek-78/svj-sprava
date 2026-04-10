@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr } from '@/components/PageShell'
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -313,98 +314,66 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-      {/* Hlavička */}
-      <div className="bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-base font-semibold text-zinc-900">Bytové jednotky</h1>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-600 text-xs font-medium">
-              <span className="font-semibold text-zinc-900">{celkem}</span> jednotek
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              <span className="font-semibold">{obsazeno}</span> obsazeno
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              <span className="font-semibold">{pronajato}</span> pronajato
-            </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
-              <span className="font-semibold">{celkem - obsazeno}</span> volné
-            </span>
-          </div>
-        </div>
-        <button
-          onClick={() => {/* TODO: přidat jednotku */}}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-          Přidat jednotku
-        </button>
-      </div>
-
-      {/* Tabulka */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
-                <tr>
-                  <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-20">Číslo</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-24">Patro</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-28">Plocha</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-28">Podíl</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Vlastník</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-40">Nájemník</th>
-                  <th className="text-center px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-24">Hlášeni</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-32">Stav</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {jednotky.map(j => {
-                  const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
-                  const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
-                  const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
-                  const maNajemnika = !!naj
-
-                  return (
-                    <tr
-                      key={j.id}
-                      onClick={() => openModal(j.id)}
-                      className="hover:bg-violet-50/50 cursor-pointer transition-colors group"
-                    >
-                      <td className="px-6 py-3.5">
-                        <span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span>
-                      </td>
-                      <td className="px-4 py-3.5 text-zinc-600">{j.patro ?? <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-4 py-3.5 text-zinc-600 tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-4 py-3.5 text-zinc-500 tabular-nums text-xs">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : <span className="text-zinc-300">—</span>}</td>
-                      <td className="px-4 py-3.5">{renderVlastnikCell(j)}</td>
-                      <td className="px-4 py-3.5">
-                        {naj ? <span className="text-zinc-700 text-sm">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300">—</span>}
-                      </td>
-                      <td className="px-4 py-3.5 text-center">
-                        {pocetBydlici > 0
-                          ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{pocetBydlici}</span>
-                          : <span className="text-zinc-300">—</span>
-                        }
-                      </td>
-                      <td className="px-4 py-3.5">
-                        {maNajemnika
-                          ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Pronajato</span>
-                          : maVlastnika
-                            ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Obsazeno</span>
-                            : <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>Volné</span>
-                        }
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-      </div>
+    <>
+    <PageShell
+      title="Bytové jednotky"
+      stats={[
+        { label: 'jednotek', value: celkem },
+        { label: 'obsazeno', value: obsazeno, dot: 'emerald', color: 'emerald' },
+        { label: 'pronajato', value: pronajato, dot: 'amber', color: 'amber' },
+        { label: 'volné', value: celkem - obsazeno, dot: 'zinc' },
+      ]}
+      actions={
+        <AddButton onClick={() => {/* TODO */}}>Přidat jednotku</AddButton>
+      }
+    >
+      <PageTable>
+        <PageThead>
+          <PageTh>Číslo</PageTh>
+          <PageTh>Patro</PageTh>
+          <PageTh>Plocha</PageTh>
+          <PageTh>Podíl</PageTh>
+          <PageTh>Vlastník</PageTh>
+          <PageTh>Nájemník</PageTh>
+          <PageTh center>Hlášeni</PageTh>
+          <PageTh>Stav</PageTh>
+        </PageThead>
+        <PageTbody>
+          {jednotky.length === 0 && <PageEmpty text="Zatím žádné jednotky." />}
+          {jednotky.map(j => {
+            const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
+            const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
+            const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
+            const maNajemnika = !!naj
+            return (
+              <PageTr key={j.id} onClick={() => openModal(j.id)}>
+                <PageTd><span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span></PageTd>
+                <PageTd>{j.patro ?? <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd className="tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd className="tabular-nums text-xs text-zinc-500">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd>{renderVlastnikCell(j)}</PageTd>
+                <PageTd>{naj ? <span className="text-zinc-700">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd center>
+                  {pocetBydlici > 0
+                    ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{pocetBydlici}</span>
+                    : <span className="text-zinc-300">—</span>}
+                </PageTd>
+                <PageTd>
+                  {maNajemnika
+                    ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Pronajato</span>
+                    : maVlastnika
+                      ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Obsazeno</span>
+                      : <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300" />Volné</span>}
+                </PageTd>
+              </PageTr>
+            )
+          })}
+        </PageTbody>
+      </PageTable>
+    </PageShell>
 
       {/* ─── Modal ─────────────────────────────────────────────────────────────── */}
+      {/* NOTE: modal is rendered outside PageShell so it overlays everything */}
       {vybranaId && vybrana && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -743,6 +712,6 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

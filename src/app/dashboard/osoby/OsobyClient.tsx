@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -327,132 +328,67 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col overflow-hidden">
-
-      {/* Hlavička */}
-      <div className="bg-white border-b border-zinc-200 px-6 py-4 flex-shrink-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-base font-semibold text-zinc-900">Osoby</h1>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-600 text-xs font-medium">
-                <span className="font-semibold text-zinc-900">{celkem}</span> celkem
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
-                <span className="font-semibold">{vlastnici}</span> vlastníků
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
-                <span className="font-semibold">{najemnici}</span> nájemníků
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Hledání */}
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-              </svg>
-              <input
-                value={hledani}
-                onChange={e => setHledani(e.target.value)}
-                placeholder="Hledat osobu…"
-                className="pl-8 pr-3 py-1.5 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white w-52"
-              />
-            </div>
-            <button
-              onClick={openNova}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-              </svg>
-              Přidat osobu
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabulka */}
-      <div className="flex-1 overflow-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-zinc-50 border-b border-zinc-200 z-10">
-            <tr>
-              <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Jméno</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">E-mail</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Telefon / Mobil</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Adresa</th>
-              <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Jednotky</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-100">
-            {filtrovane.length === 0 && (
-              <tr>
-                <td colSpan={5} className="text-center py-16 text-zinc-400 text-sm">
-                  {hledani ? 'Žádná osoba neodpovídá hledání.' : 'Zatím žádné osoby.'}
-                </td>
-              </tr>
-            )}
-            {filtrovane.map(osoba => {
-              const aktivniVazby = osoba.jednotky_osoby.filter(v => v.je_aktivni)
-              const adresa = [osoba.kontaktni_ulice, osoba.kontaktni_mesto].filter(Boolean).join(', ')
-              const kontakt = [osoba.telefon, osoba.mobil].filter(Boolean).join(' / ')
-
-              return (
-                <tr
-                  key={osoba.id}
-                  onClick={() => openModal(osoba.id)}
-                  className="hover:bg-violet-50/50 cursor-pointer transition-colors group"
-                >
-                  {/* Jméno */}
-                  <td className="px-6 py-3.5">
-                    <span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">
-                      {formatJmeno(osoba)}
-                    </span>
-                    {osoba.titul && (
-                      <span className="ml-1.5 text-xs text-zinc-400">{osoba.titul}</span>
-                    )}
-                  </td>
-
-                  {/* Email */}
-                  <td className="px-4 py-3.5 text-zinc-600">
-                    {osoba.email ?? <span className="text-zinc-300">—</span>}
-                  </td>
-
-                  {/* Telefon / Mobil */}
-                  <td className="px-4 py-3.5 text-zinc-600">
-                    {kontakt || <span className="text-zinc-300">—</span>}
-                  </td>
-
-                  {/* Adresa */}
-                  <td className="px-4 py-3.5 text-zinc-600">
-                    {adresa || <span className="text-zinc-300">—</span>}
-                  </td>
-
-                  {/* Jednotky */}
-                  <td className="px-4 py-3.5">
-                    {aktivniVazby.length === 0 ? (
-                      <span className="text-zinc-300">—</span>
-                    ) : (
-                      <div className="flex flex-wrap gap-1.5">
-                        {aktivniVazby.map(v => (
-                          <span
-                            key={v.id}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 text-xs font-medium"
-                          >
-                            <span className="font-semibold">{v.jednotky.cislo_jednotky}</span>
-                            <span className="text-zinc-400">·</span>
-                            {roleBadge(v.role)}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+    <>
+    <PageShell
+      title="Osoby"
+      stats={[
+        { label: 'celkem', value: celkem },
+        { label: 'vlastníků', value: vlastnici, color: 'emerald' },
+        { label: 'nájemníků', value: najemnici, color: 'amber' },
+      ]}
+      actions={
+        <>
+          <SearchInput value={hledani} onChange={setHledani} placeholder="Hledat osobu…" />
+          <AddButton onClick={openNova}>Přidat osobu</AddButton>
+        </>
+      }
+    >
+      <PageTable>
+        <PageThead>
+          <PageTh>Jméno</PageTh>
+          <PageTh>E-mail</PageTh>
+          <PageTh>Telefon / Mobil</PageTh>
+          <PageTh>Adresa</PageTh>
+          <PageTh>Jednotky</PageTh>
+        </PageThead>
+        <PageTbody>
+          {filtrovane.length === 0 && (
+            <PageEmpty text={hledani ? 'Žádná osoba neodpovídá hledání.' : 'Zatím žádné osoby.'} />
+          )}
+          {filtrovane.map(osoba => {
+            const aktivniVazby = osoba.jednotky_osoby.filter(v => v.je_aktivni)
+            const adresa = [osoba.kontaktni_ulice, osoba.kontaktni_mesto].filter(Boolean).join(', ')
+            const kontakt = [osoba.telefon, osoba.mobil].filter(Boolean).join(' / ')
+            return (
+              <PageTr key={osoba.id} onClick={() => openModal(osoba.id)}>
+                <PageTd>
+                  <span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{formatJmeno(osoba)}</span>
+                  {osoba.titul && <span className="ml-1.5 text-xs text-zinc-400">{osoba.titul}</span>}
+                </PageTd>
+                <PageTd>{osoba.email ?? <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd>{kontakt || <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd>{adresa || <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd>
+                  {aktivniVazby.length === 0 ? (
+                    <span className="text-zinc-300">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {aktivniVazby.map(v => (
+                        <span key={v.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 text-xs font-medium">
+                          <span className="font-semibold">{v.jednotky.cislo_jednotky}</span>
+                          <span className="text-zinc-400">·</span>
+                          {roleBadge(v.role)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </PageTd>
+              </PageTr>
+            )
+          })}
+        </PageTbody>
+      </PageTable>
+    </PageShell>
 
       {/* Modal */}
       {(vybranaId || view === 'nova') && (
@@ -621,7 +557,7 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }
 
