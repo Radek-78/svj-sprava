@@ -16,7 +16,7 @@ Kód je uložen na GitHubu a automaticky nasazován přes **Vercel** — každý
 | Databáze | Supabase (PostgreSQL s Row Level Security) |
 | Auth | Supabase Auth (email + heslo) |
 | Repozitář | GitHub — `Radek-78/svj-sprava` |
-| Hosting | Vercel (automatický deploy z větve `main`) |
+| Hosting | Vercel — napojeno na GitHub, automatický deploy z větve `main` |
 
 ---
 
@@ -58,8 +58,8 @@ src/
 1. Popíšeš co chceš změnit nebo přidat
 2. Claude přečte relevantní soubory, navrhne řešení a provede úpravy
 3. Claude zkontroluje TypeScript chyby
-4. Claude provede `git commit` a `git push`
-5. Vercel automaticky spustí nové nasazení (trvá ~1–2 minuty)
+4. Claude provede `git commit` a `git push origin main`
+5. Vercel detekuje push a automaticky spustí nové nasazení — změna je online do ~1–2 minut
 
 ---
 
