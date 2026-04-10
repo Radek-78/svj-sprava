@@ -360,117 +360,170 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
           onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
             onMouseDown={e => e.stopPropagation()}
           >
 
             {/* Hlavička */}
-            <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
+            <div className="bg-zinc-950 px-6 py-4 flex items-start justify-between flex-shrink-0">
               <div>
-                {view === 'nova'
-                  ? <h2 className="text-base font-semibold text-zinc-900">Nová osoba</h2>
-                  : <>
-                      <h2 className="text-base font-semibold text-zinc-900">{vybrana ? formatJmeno(vybrana) : ''}</h2>
-                      {vybrana?.titul && <p className="text-xs text-zinc-400 mt-0.5">{vybrana.titul}</p>}
-                    </>
-                }
+                {view !== 'detail' && (
+                  <button onClick={() => { setView('detail'); setChyba('') }}
+                    className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1.5 transition-colors">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    Zpět na detail
+                  </button>
+                )}
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                  {view === 'nova' ? 'Nová osoba' : view === 'edit' ? 'Úprava osoby' : 'Osoba'}
+                </p>
+                <div className="flex items-baseline gap-2.5 mt-0.5">
+                  <p className="text-2xl font-bold text-white">
+                    {view === 'nova' ? 'Nová osoba' : vybrana ? formatJmeno(vybrana) : ''}
+                  </p>
+                  {vybrana?.titul && view === 'detail' && (
+                    <span className="text-sm text-zinc-400">{vybrana.titul}</span>
+                  )}
+                </div>
               </div>
-              <button onClick={closeModal} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-zinc-100 text-zinc-400 hover:text-zinc-600 transition-colors">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={closeModal}
+                className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors mt-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             {/* Obsah */}
-            <div className="flex-1 overflow-y-auto px-6 py-5">
+            <div className="flex-1 overflow-hidden flex flex-col">
 
-              {/* DETAIL */}
+              {/* ── DETAIL – dvoupanelový layout ── */}
               {view === 'detail' && vybrana && (
-                <div className="space-y-5">
-                  <div className="grid grid-cols-2 gap-3">
-                    <InfoTile label="E-mail" value={vybrana.email} />
-                    <InfoTile label="Telefon" value={vybrana.telefon} />
-                    <InfoTile label="Mobil" value={vybrana.mobil} />
-                    <InfoTile label="PSČ" value={vybrana.kontaktni_psc} />
-                  </div>
+                <div className="flex flex-1 overflow-hidden">
 
-                  {(vybrana.kontaktni_ulice || vybrana.kontaktni_mesto) && (
-                    <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Adresa</p>
-                      <p className="text-sm text-zinc-800">{[vybrana.kontaktni_ulice, vybrana.kontaktni_mesto, vybrana.kontaktni_psc].filter(Boolean).join(', ')}</p>
-                    </div>
-                  )}
+                  {/* Levý panel – kontakty + akce */}
+                  <div className="w-56 flex-shrink-0 border-r border-zinc-100 flex flex-col overflow-y-auto">
+                    <div className="p-5 flex-1 space-y-1">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
 
-                  {vybrana.poznamka && (
-                    <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">Poznámka</p>
-                      <p className="text-sm text-zinc-600">{vybrana.poznamka}</p>
-                    </div>
-                  )}
+                      {vybrana.email && (
+                        <ContactRow icon="email" label="E-mail">
+                          <a href={`mailto:${vybrana.email}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors break-all">
+                            {vybrana.email}
+                          </a>
+                        </ContactRow>
+                      )}
+                      {vybrana.mobil && (
+                        <ContactRow icon="phone" label="Mobil">
+                          <a href={`tel:${vybrana.mobil}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">
+                            {vybrana.mobil}
+                          </a>
+                        </ContactRow>
+                      )}
+                      {vybrana.telefon && (
+                        <ContactRow icon="phone" label="Telefon">
+                          <a href={`tel:${vybrana.telefon}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">
+                            {vybrana.telefon}
+                          </a>
+                        </ContactRow>
+                      )}
+                      {(vybrana.kontaktni_ulice || vybrana.kontaktni_mesto) && (
+                        <ContactRow icon="address" label="Adresa">
+                          <p className="text-sm text-zinc-800 leading-snug">
+                            {[vybrana.kontaktni_ulice, vybrana.kontaktni_mesto, vybrana.kontaktni_psc].filter(Boolean).join(', ')}
+                          </p>
+                        </ContactRow>
+                      )}
+                      {!vybrana.email && !vybrana.mobil && !vybrana.telefon && !vybrana.kontaktni_ulice && (
+                        <p className="text-sm text-zinc-400 italic">Žádné kontaktní údaje.</p>
+                      )}
 
-                  <div>
-                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">Jednotky</p>
-                    {vybrana.jednotky_osoby.length === 0 ? (
-                      <p className="text-sm text-zinc-400">Žádné přiřazení.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {vybrana.jednotky_osoby.sort((a, b) => Number(b.je_aktivni) - Number(a.je_aktivni)).map(v => (
-                          <div key={v.id} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border ${v.je_aktivni ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-50'}`}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-sm text-zinc-900">Jednotka {v.jednotky.cislo_jednotky}</span>
-                                {v.jednotky.ulice_vchodu && <span className="text-xs text-zinc-400">{v.jednotky.ulice_vchodu}</span>}
-                              </div>
-                              <div className="flex items-center gap-2 mt-1">
-                                {roleBadge(v.role)}
-                                {typVlastnictviBadge(v.typ_vlastnictvi)}
-                                {v.typ_vlastnictvi === 'podilove' && v.podil_citatel && v.podil_jmenovatel && (
-                                  <span className="text-xs text-zinc-500">{v.podil_citatel}/{v.podil_jmenovatel}</span>
-                                )}
-                                {v.datum_od && <span className="text-xs text-zinc-400">od {v.datum_od}</span>}
-                                {v.datum_do && <span className="text-xs text-zinc-400">do {v.datum_do}</span>}
-                              </div>
-                            </div>
-                            {!v.je_aktivni && <span className="text-[10px] text-zinc-400 font-medium">Ukončeno</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t border-zinc-100 pt-4 flex items-center justify-between">
-                    <div>
-                      {!potvrzeni ? (
-                        <button onClick={() => setPotvrzeni(true)} className="text-xs text-red-500 hover:text-red-700 transition-colors">Smazat osobu</button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-red-600 font-medium">Opravdu smazat?</span>
-                          <button onClick={handleDelete} disabled={mazani} className="text-xs px-2.5 py-1 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition-colors">
-                            {mazani ? 'Mažu…' : 'Ano, smazat'}
-                          </button>
-                          <button onClick={() => setPotvrzeni(false)} className="text-xs text-zinc-500 hover:text-zinc-700 transition-colors">Zrušit</button>
+                      {vybrana.poznamka && (
+                        <div className="mt-4 pt-4 border-t border-zinc-50">
+                          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1.5">Poznámka</p>
+                          <p className="text-xs text-zinc-500 leading-relaxed">{vybrana.poznamka}</p>
                         </div>
                       )}
                     </div>
-                    <button onClick={openEdit} className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-800 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
-                      </svg>
-                      Upravit
-                    </button>
+
+                    {/* Akce */}
+                    <div className="p-4 border-t border-zinc-100 space-y-2 flex-shrink-0">
+                      <button onClick={openEdit}
+                        className="flex items-center justify-center gap-2 w-full border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        Upravit osobu
+                      </button>
+                      {potvrzeni ? (
+                        <div className="flex gap-1.5">
+                          <button onClick={handleDelete} disabled={mazani}
+                            className="flex-1 bg-red-600 text-white text-xs py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50">
+                            {mazani ? 'Mažu…' : 'Potvrdit'}
+                          </button>
+                          <button onClick={() => setPotvrzeni(false)}
+                            className="flex-1 border border-zinc-200 text-zinc-600 text-xs py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
+                            Zrušit
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setPotvrzeni(true)}
+                          className="w-full border border-red-200 text-red-500 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium">
+                          Smazat osobu
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pravý panel – jednotky */}
+                  <div className="flex-1 overflow-y-auto p-5">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Jednotky</p>
+                    {vybrana.jednotky_osoby.length === 0 ? (
+                      <p className="text-sm text-zinc-400 italic">Žádné přiřazení.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {vybrana.jednotky_osoby
+                          .sort((a, b) => Number(b.je_aktivni) - Number(a.je_aktivni))
+                          .map(v => (
+                            <div key={v.id} className={`px-4 py-3 rounded-xl border transition-opacity ${v.je_aktivni ? 'border-zinc-200 bg-white' : 'border-zinc-100 bg-zinc-50 opacity-50'}`}>
+                              <div className="flex items-start justify-between">
+                                <div>
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-semibold text-sm text-zinc-900">Jednotka {v.jednotky.cislo_jednotky}</span>
+                                    {v.jednotky.ulice_vchodu && <span className="text-xs text-zinc-400">{v.jednotky.ulice_vchodu}</span>}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                    {roleBadge(v.role)}
+                                    {typVlastnictviBadge(v.typ_vlastnictvi)}
+                                    {v.typ_vlastnictvi === 'podilove' && v.podil_citatel && v.podil_jmenovatel && (
+                                      <span className="text-xs text-zinc-500 font-mono">{v.podil_citatel}/{v.podil_jmenovatel}</span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 text-[10px] text-zinc-400">
+                                    {v.datum_od && <span>od {v.datum_od}</span>}
+                                    {v.datum_do && <span>do {v.datum_do}</span>}
+                                  </div>
+                                </div>
+                                {!v.je_aktivni && (
+                                  <span className="text-[10px] text-zinc-400 font-medium bg-zinc-100 px-1.5 py-0.5 rounded flex-shrink-0">Ukončeno</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* EDIT */}
+              {/* ── EDIT ── */}
               {view === 'edit' && vybrana && (
-                <OsobaForm {...formProps} onSubmit={handleSaveEdit} submitLabel="Uložit změny" />
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <OsobaForm {...formProps} onSubmit={handleSaveEdit} submitLabel="Uložit změny" />
+                </div>
               )}
 
-              {/* NOVÁ */}
+              {/* ── NOVÁ ── */}
               {view === 'nova' && (
-                <OsobaForm {...formProps} onSubmit={handleNova} submitLabel="Přidat osobu" />
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <OsobaForm {...formProps} onSubmit={handleNova} submitLabel="Přidat osobu" />
+                </div>
               )}
             </div>
           </div>
@@ -482,12 +535,35 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
 
 // ─── Sub-komponenty ───────────────────────────────────────────────────────────
 
-function InfoTile({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null
+const ICONS = {
+  email: (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+    </svg>
+  ),
+  phone: (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+    </svg>
+  ),
+  address: (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+    </svg>
+  ),
+}
+
+function ContactRow({ icon, label, children }: { icon: keyof typeof ICONS; label: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3">
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-0.5">{label}</p>
-      <p className="text-sm font-medium text-zinc-800">{value}</p>
+    <div className="flex items-start gap-2.5 py-2 border-b border-zinc-50 last:border-0">
+      <div className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center flex-shrink-0 mt-0.5 text-zinc-400">
+        {ICONS[icon]}
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide leading-none mb-0.5">{label}</p>
+        {children}
+      </div>
     </div>
   )
 }
