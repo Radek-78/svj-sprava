@@ -313,57 +313,54 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col overflow-hidden">
       {/* Hlavička */}
-      <div className="px-8 py-5 bg-white/80 backdrop-blur-sm border-b border-zinc-200 flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="text-xl font-bold text-zinc-900">Bytové jednotky</h1>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded-lg">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
-              {celkem} jednotek
+      <div className="bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <h1 className="text-base font-semibold text-zinc-900">Bytové jednotky</h1>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-600 text-xs font-medium">
+              <span className="font-semibold text-zinc-900">{celkem}</span> jednotek
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg ring-1 ring-emerald-200">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              {obsazeno} obsazeno
+              <span className="font-semibold">{obsazeno}</span> obsazeno
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg ring-1 ring-amber-200">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 text-xs font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-              {pronajato} pronajato
+              <span className="font-semibold">{pronajato}</span> pronajato
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded-lg">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 text-xs font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
-              {celkem - obsazeno} volné
+              <span className="font-semibold">{celkem - obsazeno}</span> volné
             </span>
           </div>
         </div>
         <button
           onClick={() => {/* TODO: přidat jednotku */}}
-          className="flex items-center gap-1.5 bg-zinc-950 text-white text-sm px-4 py-2 rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
           Přidat jednotku
         </button>
       </div>
 
       {/* Tabulka */}
-      <div className="flex-1 overflow-hidden px-8 py-5">
-        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm h-full flex flex-col overflow-hidden">
-          <div className="overflow-y-auto flex-1">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
                 <tr>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-20">Číslo</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-24">Patro</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-28">Plocha</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-28">Podíl</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Vlastník</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-40">Nájemník</th>
-                  <th className="text-center px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-24">Hlášeni</th>
-                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-32">Stav</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-20">Číslo</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-24">Patro</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-28">Plocha</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-28">Podíl</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Vlastník</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-40">Nájemník</th>
+                  <th className="text-center px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-24">Hlášeni</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-zinc-500 uppercase tracking-wide w-32">Stav</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-zinc-100">
                 {jednotky.map(j => {
                   const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
                   const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
@@ -374,25 +371,25 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                     <tr
                       key={j.id}
                       onClick={() => openModal(j.id)}
-                      className="border-b border-zinc-100 cursor-pointer transition-all hover:bg-violet-50/60 group"
+                      className="hover:bg-violet-50/50 cursor-pointer transition-colors group"
                     >
-                      <td className="px-4 py-3">
-                        <span className="font-bold text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span>
+                      <td className="px-6 py-3.5">
+                        <span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span>
                       </td>
-                      <td className="px-4 py-3 text-zinc-500">{j.patro ?? '—'}</td>
-                      <td className="px-4 py-3 text-zinc-600 tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : '—'}</td>
-                      <td className="px-4 py-3 text-zinc-400 tabular-nums text-xs">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : '—'}</td>
-                      <td className="px-4 py-3">{renderVlastnikCell(j)}</td>
-                      <td className="px-4 py-3">
-                        {naj ? <span className="text-zinc-700 text-sm">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300 italic text-xs">—</span>}
+                      <td className="px-4 py-3.5 text-zinc-600">{j.patro ?? <span className="text-zinc-300">—</span>}</td>
+                      <td className="px-4 py-3.5 text-zinc-600 tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : <span className="text-zinc-300">—</span>}</td>
+                      <td className="px-4 py-3.5 text-zinc-500 tabular-nums text-xs">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : <span className="text-zinc-300">—</span>}</td>
+                      <td className="px-4 py-3.5">{renderVlastnikCell(j)}</td>
+                      <td className="px-4 py-3.5">
+                        {naj ? <span className="text-zinc-700 text-sm">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300">—</span>}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3.5 text-center">
                         {pocetBydlici > 0
                           ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{pocetBydlici}</span>
-                          : <span className="text-zinc-300 text-xs">—</span>
+                          : <span className="text-zinc-300">—</span>
                         }
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3.5">
                         {maNajemnika
                           ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Pronajato</span>
                           : maVlastnika
@@ -405,22 +402,16 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                 })}
               </tbody>
             </table>
-          </div>
-          <div className="px-4 py-2.5 border-t border-zinc-100 bg-zinc-50/50 text-xs text-zinc-400 flex justify-between flex-shrink-0">
-            <span>Celkem {celkem} jednotek</span>
-            <span>Kliknutím na řádek zobrazíte detail</span>
-          </div>
-        </div>
       </div>
 
       {/* ─── Modal ─────────────────────────────────────────────────────────────── */}
       {vybranaId && vybrana && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeModal}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
-            onClick={e => e.stopPropagation()}
-          >
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.3)' }}
+          onClick={e => { if (e.target === e.currentTarget) closeModal() }}
+        >
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal hlavička */}
             <div className="bg-zinc-950 px-6 py-4 flex items-start justify-between flex-shrink-0">
               <div>
