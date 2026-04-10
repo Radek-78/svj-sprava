@@ -24,6 +24,7 @@ type Vazba = {
 type Jednotka = {
   id: string
   cislo_jednotky: string
+  var_symbol: string | null
   vchod: string | null
   ulice_vchodu: string | null
   patro: number | null
@@ -40,6 +41,7 @@ type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydl
 
 type EditForm = {
   cislo_jednotky: string
+  var_symbol: string
   vchod: string
   ulice_vchodu: string
   patro: string
@@ -97,7 +99,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
   const [chyba, setChyba] = useState('')
 
   const [editForm, setEditForm] = useState<EditForm>({
-    cislo_jednotky: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
+    cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
     vytapena_plocha: '', podil_citatel: '', podil_jmenovatel: '10000',
     pocet_pokoju: '', poznamka: '',
   })
@@ -165,6 +167,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
     if (!vybrana) return
     setEditForm({
       cislo_jednotky: vybrana.cislo_jednotky,
+      var_symbol: vybrana.var_symbol ?? '',
       vchod: vybrana.vchod ?? '',
       ulice_vchodu: vybrana.ulice_vchodu ?? '',
       patro: vybrana.patro?.toString() ?? '',
@@ -203,6 +206,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
     setUkladani(true); setChyba('')
     const { error } = await supabase.from('jednotky').update({
       cislo_jednotky: editForm.cislo_jednotky,
+      var_symbol: editForm.var_symbol || null,
       vchod: editForm.vchod || null,
       ulice_vchodu: editForm.ulice_vchodu || null,
       patro: editForm.patro ? parseInt(editForm.patro) : null,
@@ -420,12 +424,13 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                 <div>
                   {/* Info dlaždice */}
                   <div className="px-6 py-5 border-b border-zinc-100">
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-5 gap-2">
                       {[
                         { l: 'Patro', v: vybrana.patro ?? '—' },
                         { l: 'Plocha', v: vybrana.uzitna_plocha ? `${vybrana.uzitna_plocha} m²` : '—' },
                         { l: 'Podíl', v: vybrana.podil_citatel ? `${vybrana.podil_citatel}/${vybrana.podil_jmenovatel}` : '—' },
                         { l: 'Pokojů', v: vybrana.pocet_pokoju ?? '—' },
+                        { l: 'Var. symbol', v: vybrana.var_symbol ?? '—' },
                       ].map(({ l, v }) => (
                         <div key={l} className="bg-zinc-50 rounded-xl px-3 py-2.5">
                           <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{l}</p>
@@ -573,6 +578,10 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                       <label className={LABEL}>Patro</label>
                       <input type="number" value={editForm.patro} onChange={e => setEditForm(p => ({ ...p, patro: e.target.value }))} className={INPUT} />
                     </div>
+                  </div>
+                  <div>
+                    <label className={LABEL}>Variabilní symbol</label>
+                    <input value={editForm.var_symbol} onChange={e => setEditForm(p => ({ ...p, var_symbol: e.target.value }))} className={INPUT} placeholder="např. 2051711011" />
                   </div>
                   <div>
                     <label className={LABEL}>Ulice vchodu</label>
