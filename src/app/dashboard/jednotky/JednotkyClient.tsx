@@ -43,6 +43,7 @@ type Jednotka = {
   podil_jmenovatel: number | null
   pocet_pokoju: number | null
   poznamka: string | null
+  pravdepodobny_pronajem: boolean
   jednotky_osoby: Vazba[]
   jednotky_cipy: Cip[]
 }
@@ -170,7 +171,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const refreshJednotky = useCallback(async () => {
     const { data } = await supabase
       .from('jednotky')
-      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), jednotky_cipy(id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, osoby(id, jmeno, prijmeni))`)
+      .select(`
+        *, 
+        jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), 
+        jednotky_cipy(id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, osoby(id, jmeno, prijmeni))
+      `)
       .order('cislo_jednotky')
     if (data) setJednotky(data as unknown as Jednotka[])
   }, [])
@@ -349,6 +354,23 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     setMazani(false)
   }
 
+  // ── Přepnout pravděpodobný pronájem ──
+  async function handleTogglePravdepodobnyPronajem() {
+    if (!vybranaId || !vybrana) return
+    const novyStav = !vybrana.pravdepodobny_pronajem
+    const { error } = await supabase
+      .from('jednotky')
+      .update({ pravdepodobny_pronajem: novyStav })
+      .eq('id', vybranaId)
+    
+    if (error) {
+      setChyba(error.message)
+      return
+    }
+    await refreshJednotky()
+    router.refresh()
+  }
+
   // ─── Render tabulky ──────────────────────────────────────────────────────────
 
   function renderVlastnikCell(j: Jednotka) {
@@ -439,8 +461,19 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                   {maNajemnika
                     ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400" />Pronajato</span>
                     : maVlastnika
-                      ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />Obsazeno</span>
-                      : <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300" />Volné</span>}
+                      ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">
+                          {j.pravdepodobny_pronajem && <span className="mr-0.5 text-[10px]" title="Očekávaný pronájem">📬</span>}
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                          Obsazeno
+                        </span>
+                      : j.pravdepodobny_pronajem
+                        ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-700 ring-1 ring-violet-200 shadow-sm animate-pulse">
+                            📬 Očekáváno
+                          </span>
+                        : <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
+                            Volné
+                          </span>}
                 </PageTd>
               </PageTr>
             )
@@ -514,8 +547,28 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                           </div>
                         ))}
                       </div>
+
+                      <button 
+                        onClick={handleTogglePravdepodobnyPronajem}
+                        className={`mt-4 w-full flex items-center justify-between p-2.5 rounded-xl border transition-all ${
+                          vybrana.pravdepodobny_pronajem 
+                            ? 'bg-violet-50 border-violet-200 text-violet-700 shadow-sm' 
+                            : 'bg-white border-zinc-100 text-zinc-400 hover:border-zinc-200 hover:text-zinc-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className={`p-1 rounded-lg ${vybrana.pravdepodobny_pronajem ? 'bg-violet-500 text-white' : 'bg-zinc-100 text-zinc-400'}`}>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-wider">Očekávaný pronájem</span>
+                        </div>
+                        <div className={`w-7 h-4 rounded-full p-0.5 transition-colors ${vybrana.pravdepodobny_pronajem ? 'bg-violet-500' : 'bg-zinc-200'}`}>
+                          <div className={`w-3 h-3 bg-white rounded-full shadow-sm transform transition-transform ${vybrana.pravdepodobny_pronajem ? 'translate-x-3' : 'translate-x-0'}`} />
+                        </div>
+                      </button>
+
                       {vybrana.poznamka && (
-                        <div className="mt-5 bg-white border border-zinc-100 rounded-xl p-3 shadow-sm">
+                        <div className="mt-4 bg-white border border-zinc-100 rounded-xl p-3 shadow-sm">
                           <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Poznámka</p>
                           <p className="text-xs text-zinc-600 leading-relaxed">{vybrana.poznamka}</p>
                         </div>
