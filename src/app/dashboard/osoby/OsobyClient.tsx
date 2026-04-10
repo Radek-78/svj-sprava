@@ -336,8 +336,12 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
         { label: 'vlastníků', value: vlastnici, color: 'emerald' },
         { label: 'nájemníků', value: najemnici, color: 'amber' },
       ]}
-      actions={<AddButton onClick={openNova}>Přidat osobu</AddButton>}
-      toolbar={<SearchInput value={hledani} onChange={setHledani} placeholder="Hledat osobu…" />}
+      actions={
+        <>
+          <SearchInput value={hledani} onChange={setHledani} placeholder="Hledat osobu…" />
+          <AddButton onClick={openNova}>Přidat osobu</AddButton>
+        </>
+      }
     >
       <PageTable>
         <PageThead>

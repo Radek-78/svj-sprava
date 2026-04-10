@@ -12,8 +12,7 @@ type StatPill = {
 type PageShellProps = {
   title: string
   stats: StatPill[]
-  actions?: React.ReactNode   // pravá část hlavičky (tlačítko Přidat apod.)
-  toolbar?: React.ReactNode   // volitelný řádek pod hlavičkou (vyhledávání, filtry)
+  actions?: React.ReactNode
   children: React.ReactNode
 }
 
@@ -35,40 +34,35 @@ const PILL_COLORS = {
 
 // ─── Komponenta ───────────────────────────────────────────────────────────────
 
-export default function PageShell({ title, stats, actions, toolbar, children }: PageShellProps) {
+export default function PageShell({ title, stats, actions, children }: PageShellProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Hlavička — identická u všech záložek */}
-      <div className="bg-white border-b border-zinc-200 px-6 h-14 flex items-center justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
-          <h1 className="text-base font-semibold text-zinc-900">{title}</h1>
-          <div className="flex items-center gap-2">
-            {stats.map((s, i) => (
-              <span
-                key={i}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${PILL_COLORS[s.color ?? 'zinc']}`}
-              >
-                {s.dot && <span className={`w-1.5 h-1.5 rounded-full ${DOT_COLORS[s.dot]}`} />}
-                <span className="font-semibold">{s.value}</span>
-                {s.label}
-              </span>
-            ))}
+      {/* Hlavička — pevná výška 56px, identická u všech záložek */}
+      <div className="bg-white border-b border-zinc-200 px-6 flex-shrink-0" style={{ height: 56 }}>
+        <div className="h-full flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            <h1 className="text-base font-semibold text-zinc-900 whitespace-nowrap">{title}</h1>
+            <div className="flex items-center gap-2">
+              {stats.map((s, i) => (
+                <span
+                  key={i}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${PILL_COLORS[s.color ?? 'zinc']}`}
+                >
+                  {s.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT_COLORS[s.dot]}`} />}
+                  <span className="font-semibold">{s.value}</span>
+                  {s.label}
+                </span>
+              ))}
+            </div>
           </div>
+          {actions && (
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {actions}
+            </div>
+          )}
         </div>
-        {actions && (
-          <div className="flex items-center gap-3">
-            {actions}
-          </div>
-        )}
       </div>
-
-      {/* Volitelný toolbar (vyhledávání, filtry) */}
-      {toolbar && (
-        <div className="bg-white border-b border-zinc-100 px-6 h-12 flex items-center gap-3 flex-shrink-0">
-          {toolbar}
-        </div>
-      )}
 
       {/* Obsah */}
       <div className="flex-1 overflow-auto">
