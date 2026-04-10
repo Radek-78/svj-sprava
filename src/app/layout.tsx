@@ -1,25 +1,18 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next'
+import { Geist } from 'next/font/google'
+import './globals.css'
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
 export const metadata: Metadata = {
-  title: "SVJ Správa",
-  description: "Aplikace pro správu společenství vlastníků jednotek",
-};
+  title: 'SVJ Správa',
+  description: 'Správa společenství vlastníků jednotek',
+}
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="cs" className={`${geistSans.variable} h-full`}>
-      <body className="h-full bg-gray-50 antialiased">{children}</body>
+    <html lang="cs" className={`${geist.variable} h-full`}>
+      <body className="h-full antialiased">{children}</body>
     </html>
-  );
+  )
 }

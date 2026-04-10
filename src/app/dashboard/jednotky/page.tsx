@@ -6,11 +6,17 @@ export default async function JednotkyPage() {
 
   const { data: jednotky } = await supabase
     .from('jednotky')
-    .select(`*, vlastnici!left(je_aktivni, osoby(id, jmeno, prijmeni)), najemnici!left(je_aktivni)`)
+    .select(`
+      *,
+      jednotky_osoby(
+        id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni,
+        osoby(id, jmeno, prijmeni)
+      )
+    `)
     .order('cislo_jednotky')
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       <JednotkyClient jednotky={jednotky ?? []} />
     </div>
   )

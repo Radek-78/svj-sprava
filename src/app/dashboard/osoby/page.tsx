@@ -6,11 +6,17 @@ export default async function OsobyPage() {
 
   const { data: osoby } = await supabase
     .from('osoby')
-    .select('*')
+    .select(`
+      *,
+      jednotky_osoby(
+        id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni,
+        jednotky(id, cislo_jednotky, ulice_vchodu)
+      )
+    `)
     .order('prijmeni')
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="h-full flex flex-col overflow-hidden">
       <OsobyClient osoby={osoby ?? []} />
     </div>
   )

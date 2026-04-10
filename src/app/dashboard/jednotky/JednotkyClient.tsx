@@ -1,687 +1,556 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+
+// ─── Typy ────────────────────────────────────────────────────────────────────
+
+type Osoba = { id: string; jmeno: string | null; prijmeni: string }
+
+type Vazba = {
+  id: string
+  role: 'vlastnik' | 'najemnik' | 'bydlici'
+  typ_vlastnictvi: 'individualni' | 'podilove' | 'sjm' | 'mcp' | null
+  podil_citatel: number | null
+  podil_jmenovatel: number | null
+  datum_od: string | null
+  datum_do: string | null
+  je_aktivni: boolean
+  osoby: Osoba
+}
 
 type Jednotka = {
   id: string
   cislo_jednotky: string
+  ulice_vchodu: string | null
   patro: number | null
-  vymera_m2: number
-  podil_citatel: number
-  podil_jmenovatel: number
+  uzitna_plocha: number | null
+  vytapena_plocha: number | null
+  podil_citatel: number | null
+  podil_jmenovatel: number | null
+  pocet_pokoju: number | null
   poznamka: string | null
-  vlastnici: { je_aktivni: boolean; osoby: { jmeno: string | null; prijmeni: string } }[]
-  najemnici: { je_aktivni: boolean }[]
+  jednotky_osoby: Vazba[]
 }
 
-type Osoba = {
-  id: string
-  jmeno: string | null
-  prijmeni: string
-}
-
-type Vlastnik = {
-  id: string
-  datum_od: string
-  osoby: { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null }
-}
-
-type Najemnik = {
-  id: string
-  datum_od: string
-  osoby: { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null }
-}
-
-type Detail = {
-  jednotka: Jednotka
-  vlastnici: Vlastnik[]
-  najemnici: Najemnik[]
-}
+type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici'
 
 type EditForm = {
   cislo_jednotky: string
+  ulice_vchodu: string
   patro: string
-  vymera_m2: string
+  uzitna_plocha: string
+  vytapena_plocha: string
   podil_citatel: string
   podil_jmenovatel: string
+  pocet_pokoju: string
   poznamka: string
 }
 
-type OsobaDetail = {
-  id: string
-  jmeno: string | null
-  prijmeni: string
-  email: string | null
-  telefon: string | null
-  adresa_ulice: string | null
-  adresa_mesto: string | null
-  adresa_psc: string | null
-  poznamka: string | null
-  jakoVlastnik: { id: string; jednotky: { id: string; cislo_jednotky: string } }[]
-  jakoNajemnik: { id: string; jednotky: { id: string; cislo_jednotky: string } }[]
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatJmeno(o: Osoba) {
+  return [o.prijmeni, o.jmeno].filter(Boolean).join(' ')
 }
 
-const dnesStr = new Date().toISOString().split('T')[0]
+function typVlastnictviLabel(typ: string | null) {
+  const map: Record<string, string> = {
+    individualni: 'Individuální',
+    podilove: 'Podílové',
+    sjm: 'SJM',
+    mcp: 'MCP',
+  }
+  return typ ? (map[typ] ?? typ) : ''
+}
 
-export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
+function typVlastnictviBadge(typ: string | null) {
+  if (!typ || typ === 'individualni') return null
+  const colors: Record<string, string> = {
+    sjm: 'bg-blue-50 text-blue-700 ring-blue-200',
+    mcp: 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+    podilove: 'bg-violet-50 text-violet-700 ring-violet-200',
+  }
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 ${colors[typ] ?? 'bg-zinc-100 text-zinc-600'}`}>
+      {typ.toUpperCase()}
+    </span>
+  )
+}
+
+const INPUT = 'w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white'
+const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
+
+// ─── Komponenta ───────────────────────────────────────────────────────────────
+
+export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednotka[] }) {
+  const [jednotky, setJednotky] = useState(initial)
   const [vybranaId, setVybranaId] = useState<string | null>(null)
-  const [detail, setDetail] = useState<Detail | null>(null)
-  const [nacitaniDetail, setNacitaniDetail] = useState(false)
+  const [view, setView] = useState<ModalView>('detail')
+  const [vsechnyOsoby, setVsechnyOsoby] = useState<Osoba[]>([])
   const [mazani, setMazani] = useState(false)
-  const [potvrzeniSmazani, setPotvrzeniSmazani] = useState(false)
-
-  // Edit mode
-  const [editMode, setEditMode] = useState(false)
-  const [editForm, setEditForm] = useState<EditForm>({ cislo_jednotky: '', patro: '', vymera_m2: '', podil_citatel: '', podil_jmenovatel: '', poznamka: '' })
-  const [editChyba, setEditChyba] = useState('')
-  const [editUkladani, setEditUkladani] = useState(false)
-
-  // Osoba view mode
-  const [osobaView, setOsobaView] = useState<OsobaDetail | null>(null)
-  const [nacitaniOsoby, setNacitaniOsoby] = useState(false)
-
-  // Add owner/tenant forms
-  const [formVlastnik, setFormVlastnik] = useState(false)
-  const [formNajemnik, setFormNajemnik] = useState(false)
-  const [osoby, setOsoby] = useState<Osoba[]>([])
-  const [osobaVlastnik, setOsobaVlastnik] = useState('')
-  const [datumVlastnik, setDatumVlastnik] = useState(dnesStr)
-  const [osobaNajemnik, setOsobaNajemnik] = useState('')
-  const [datumNajemnik, setDatumNajemnik] = useState(dnesStr)
+  const [potvrzeni, setPotvrzeni] = useState(false)
   const [ukladani, setUkladani] = useState(false)
+  const [chyba, setChyba] = useState('')
+
+  const [editForm, setEditForm] = useState<EditForm>({
+    cislo_jednotky: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
+    vytapena_plocha: '', podil_citatel: '', podil_jmenovatel: '10000',
+    pocet_pokoju: '', poznamka: '',
+  })
+
+  // Add vlastník form
+  const [avTyp, setAvTyp] = useState<'individualni' | 'podilove' | 'sjm' | 'mcp'>('individualni')
+  const [avOsoba1, setAvOsoba1] = useState('')
+  const [avOsoba2, setAvOsoba2] = useState('')
+  const [avPodilC, setAvPodilC] = useState('')
+  const [avPodilJ, setAvPodilJ] = useState('')
+  const [avPodilC2, setAvPodilC2] = useState('')
+  const [avPodilJ2, setAvPodilJ2] = useState('')
+  const [avDatum, setAvDatum] = useState(new Date().toISOString().split('T')[0])
+
+  // Add nájemník / bydlící form
+  const [anOsoba, setAnOsoba] = useState('')
+  const [anDatum, setAnDatum] = useState(new Date().toISOString().split('T')[0])
 
   const router = useRouter()
   const supabase = createClient()
 
+  const vybrana = jednotky.find(j => j.id === vybranaId) ?? null
+
+  // Aktivní vazby
+  const aktivniVlastnici = vybrana?.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni) ?? []
+  const aktivniNajemnik = vybrana?.jednotky_osoby.filter(v => v.role === 'najemnik' && v.je_aktivni) ?? []
+  const aktivniBydlici = vybrana?.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni) ?? []
+
+  // Statistiky
   const celkem = jednotky.length
-  const sVlastnikem = jednotky.filter(j => j.vlastnici.some(v => v.je_aktivni)).length
-  const sNajemnikem = jednotky.filter(j => j.najemnici.some(n => n.je_aktivni)).length
+  const obsazeno = jednotky.filter(j => j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)).length
+  const pronajato = jednotky.filter(j => j.jednotky_osoby.some(v => v.role === 'najemnik' && v.je_aktivni)).length
 
+  // Načíst osoby při otevření modalu
   useEffect(() => {
-    if (!vybranaId) { setDetail(null); return }
-    setNacitaniDetail(true)
-    setPotvrzeniSmazani(false)
-    setFormVlastnik(false)
-    setFormNajemnik(false)
-    setEditMode(false)
-    setOsobaView(null)
-
-    async function fetchDetail() {
-      const jed = jednotky.find(j => j.id === vybranaId)!
-      const [{ data: vl }, { data: naj }, { data: os }] = await Promise.all([
-        supabase.from('vlastnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId!).eq('je_aktivni', true),
-        supabase.from('najemnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId!).eq('je_aktivni', true),
-        supabase.from('osoby').select('id, jmeno, prijmeni').order('prijmeni'),
-      ])
-      setDetail({ jednotka: jed, vlastnici: (vl ?? []) as unknown as Vlastnik[], najemnici: (naj ?? []) as unknown as Najemnik[] })
-      setOsoby(os ?? [])
-      setNacitaniDetail(false)
-    }
-    fetchDetail()
+    if (!vybranaId) return
+    supabase.from('osoby').select('id, jmeno, prijmeni').order('prijmeni')
+      .then(({ data }) => setVsechnyOsoby(data ?? []))
   }, [vybranaId])
 
-  async function openOsoba(osobaId: string) {
-    setNacitaniOsoby(true)
-    setOsobaView(null)
-    setEditMode(false)
-    const [{ data: o }, { data: vl }, { data: naj }] = await Promise.all([
-      supabase.from('osoby').select('*').eq('id', osobaId).single(),
-      supabase.from('vlastnici').select('id, jednotky(id, cislo_jednotky)').eq('osoba_id', osobaId).eq('je_aktivni', true),
-      supabase.from('najemnici').select('id, jednotky(id, cislo_jednotky)').eq('osoba_id', osobaId).eq('je_aktivni', true),
-    ])
-    if (o) {
-      setOsobaView({
-        ...o,
-        jakoVlastnik: (vl ?? []) as unknown as OsobaDetail['jakoVlastnik'],
-        jakoNajemnik: (naj ?? []) as unknown as OsobaDetail['jakoNajemnik'],
-      })
-    }
-    setNacitaniOsoby(false)
+  // Refresh dat ze serveru
+  const refreshJednotky = useCallback(async () => {
+    const { data } = await supabase
+      .from('jednotky')
+      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni))`)
+      .order('cislo_jednotky')
+    if (data) setJednotky(data as Jednotka[])
+  }, [])
+
+  function openModal(id: string) {
+    setVybranaId(id)
+    setView('detail')
+    setPotvrzeni(false)
+    setChyba('')
+  }
+
+  function closeModal() {
+    setVybranaId(null)
+    setView('detail')
+    setPotvrzeni(false)
+    setChyba('')
   }
 
   function openEdit() {
-    if (!detail) return
-    const j = detail.jednotka
+    if (!vybrana) return
     setEditForm({
-      cislo_jednotky: j.cislo_jednotky,
-      patro: j.patro?.toString() ?? '',
-      vymera_m2: j.vymera_m2.toString(),
-      podil_citatel: j.podil_citatel.toString(),
-      podil_jmenovatel: j.podil_jmenovatel.toString(),
-      poznamka: j.poznamka ?? '',
+      cislo_jednotky: vybrana.cislo_jednotky,
+      ulice_vchodu: vybrana.ulice_vchodu ?? '',
+      patro: vybrana.patro?.toString() ?? '',
+      uzitna_plocha: vybrana.uzitna_plocha?.toString() ?? '',
+      vytapena_plocha: vybrana.vytapena_plocha?.toString() ?? '',
+      podil_citatel: vybrana.podil_citatel?.toString() ?? '',
+      podil_jmenovatel: vybrana.podil_jmenovatel?.toString() ?? '10000',
+      pocet_pokoju: vybrana.pocet_pokoju?.toString() ?? '',
+      poznamka: vybrana.poznamka ?? '',
     })
-    setEditChyba('')
-    setEditMode(true)
+    setChyba('')
+    setView('edit')
   }
 
+  function openAddVlastnik() {
+    setAvTyp('individualni'); setAvOsoba1(''); setAvOsoba2('')
+    setAvPodilC(''); setAvPodilJ(''); setAvPodilC2(''); setAvPodilJ2('')
+    setAvDatum(new Date().toISOString().split('T')[0])
+    setChyba(''); setView('add-vlastnik')
+  }
+
+  function openAddNajemnik() {
+    setAnOsoba(''); setAnDatum(new Date().toISOString().split('T')[0])
+    setChyba(''); setView('add-najemnik')
+  }
+
+  function openAddBydlici() {
+    setAnOsoba(''); setAnDatum(new Date().toISOString().split('T')[0])
+    setChyba(''); setView('add-bydlici')
+  }
+
+  // ── Uložit úpravu jednotky ──
   async function handleSaveEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!vybranaId) return
-    setEditUkladani(true)
-    setEditChyba('')
+    setUkladani(true); setChyba('')
     const { error } = await supabase.from('jednotky').update({
       cislo_jednotky: editForm.cislo_jednotky,
+      ulice_vchodu: editForm.ulice_vchodu || null,
       patro: editForm.patro ? parseInt(editForm.patro) : null,
-      vymera_m2: parseFloat(editForm.vymera_m2),
-      podil_citatel: parseInt(editForm.podil_citatel),
-      podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
+      uzitna_plocha: editForm.uzitna_plocha ? parseFloat(editForm.uzitna_plocha) : null,
+      vytapena_plocha: editForm.vytapena_plocha ? parseFloat(editForm.vytapena_plocha) : null,
+      podil_citatel: editForm.podil_citatel ? parseInt(editForm.podil_citatel) : null,
+      podil_jmenovatel: editForm.podil_jmenovatel ? parseInt(editForm.podil_jmenovatel) : null,
+      pocet_pokoju: editForm.pocet_pokoju ? parseInt(editForm.pocet_pokoju) : null,
       poznamka: editForm.poznamka || null,
     }).eq('id', vybranaId)
-    if (error) {
-      setEditChyba('Chyba: ' + error.message)
-      setEditUkladani(false)
-    } else {
-      router.refresh()
-      setEditMode(false)
-      setEditUkladani(false)
-      // Aktualizuj detail lokálně
-      setDetail(prev => prev ? {
-        ...prev,
-        jednotka: {
-          ...prev.jednotka,
-          cislo_jednotky: editForm.cislo_jednotky,
-          patro: editForm.patro ? parseInt(editForm.patro) : null,
-          vymera_m2: parseFloat(editForm.vymera_m2),
-          podil_citatel: parseInt(editForm.podil_citatel),
-          podil_jmenovatel: parseInt(editForm.podil_jmenovatel),
-          poznamka: editForm.poznamka || null,
-        }
-      } : null)
+    if (error) { setChyba(error.message); setUkladani(false); return }
+    await refreshJednotky()
+    router.refresh()
+    setView('detail')
+    setUkladani(false)
+  }
+
+  // ── Přidat vlastníka ──
+  async function handleAddVlastnik(e: React.FormEvent) {
+    e.preventDefault()
+    if (!vybranaId || !avOsoba1) return
+    setUkladani(true); setChyba('')
+
+    const zaznamy: object[] = []
+
+    if (avTyp === 'individualni') {
+      zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba1, role: 'vlastnik', typ_vlastnictvi: 'individualni', datum_od: avDatum, je_aktivni: true })
+    } else if (avTyp === 'sjm' || avTyp === 'mcp') {
+      zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba1, role: 'vlastnik', typ_vlastnictvi: avTyp, datum_od: avDatum, je_aktivni: true })
+      if (avOsoba2) zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba2, role: 'vlastnik', typ_vlastnictvi: avTyp, datum_od: avDatum, je_aktivni: true })
+    } else if (avTyp === 'podilove') {
+      zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba1, role: 'vlastnik', typ_vlastnictvi: 'podilove', podil_citatel: parseInt(avPodilC) || null, podil_jmenovatel: parseInt(avPodilJ) || null, datum_od: avDatum, je_aktivni: true })
+      if (avOsoba2) zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba2, role: 'vlastnik', typ_vlastnictvi: 'podilove', podil_citatel: parseInt(avPodilC2) || null, podil_jmenovatel: parseInt(avPodilJ2) || null, datum_od: avDatum, je_aktivni: true })
     }
-  }
 
-  async function refreshVlastnici() {
-    const { data: vl } = await supabase.from('vlastnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId!).eq('je_aktivni', true)
-    setDetail(prev => prev ? { ...prev, vlastnici: (vl ?? []) as unknown as Vlastnik[] } : null)
-  }
-
-  async function refreshNajemnici() {
-    const { data: naj } = await supabase.from('najemnici').select('id, datum_od, osoby(id, jmeno, prijmeni, email, telefon)').eq('jednotka_id', vybranaId!).eq('je_aktivni', true)
-    setDetail(prev => prev ? { ...prev, najemnici: (naj ?? []) as unknown as Najemnik[] } : null)
-  }
-
-  async function handlePridatVlastnika() {
-    if (!osobaVlastnik || !vybranaId) return
-    setUkladani(true)
-    await supabase.from('vlastnici').insert({ jednotka_id: vybranaId, osoba_id: osobaVlastnik, datum_od: datumVlastnik, je_aktivni: true })
-    await refreshVlastnici()
-    setFormVlastnik(false)
-    setOsobaVlastnik('')
+    const { error } = await supabase.from('jednotky_osoby').insert(zaznamy)
+    if (error) { setChyba(error.message); setUkladani(false); return }
+    await refreshJednotky()
     router.refresh()
+    setView('detail')
     setUkladani(false)
   }
 
-  async function handlePridatNajemnika() {
-    if (!osobaNajemnik || !vybranaId) return
-    setUkladani(true)
-    await supabase.from('najemnici').insert({ jednotka_id: vybranaId, osoba_id: osobaNajemnik, datum_od: datumNajemnik, je_aktivni: true })
-    await refreshNajemnici()
-    setFormNajemnik(false)
-    setOsobaNajemnik('')
+  // ── Přidat nájemníka / bydlícího ──
+  async function handleAddVazba(role: 'najemnik' | 'bydlici') {
+    if (!vybranaId || !anOsoba) return
+    setUkladani(true); setChyba('')
+    const { error } = await supabase.from('jednotky_osoby').insert({
+      jednotka_id: vybranaId, osoba_id: anOsoba, role, datum_od: anDatum, je_aktivni: true,
+    })
+    if (error) { setChyba(error.message); setUkladani(false); return }
+    await refreshJednotky()
     router.refresh()
+    setView('detail')
     setUkladani(false)
   }
 
+  // ── Ukončit vazbu ──
+  async function handleUkoncitVazbu(vazbaId: string) {
+    await supabase.from('jednotky_osoby').update({ je_aktivni: false, datum_do: new Date().toISOString().split('T')[0] }).eq('id', vazbaId)
+    await refreshJednotky()
+    router.refresh()
+  }
+
+  // ── Smazat jednotku ──
   async function handleSmazat() {
     if (!vybranaId) return
     setMazani(true)
     await supabase.from('jednotky').delete().eq('id', vybranaId)
-    setVybranaId(null)
+    await refreshJednotky()
     router.refresh()
+    closeModal()
     setMazani(false)
   }
 
-  function formatJmeno(o: { jmeno: string | null; prijmeni: string }) {
-    return [o.jmeno, o.prijmeni].filter(Boolean).join(' ')
+  // ─── Render tabulky ──────────────────────────────────────────────────────────
+
+  function renderVlastnikCell(j: Jednotka) {
+    const vl = j.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni)
+    if (vl.length === 0) return <span className="text-zinc-300 italic text-xs">—</span>
+
+    // SJM / MCP – zobraz spolu
+    const typ = vl[0].typ_vlastnictvi
+    if (typ === 'sjm' || typ === 'mcp') {
+      return (
+        <span className="text-zinc-700 text-sm">
+          <span className={`mr-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded ring-1 ${typ === 'sjm' ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-indigo-50 text-indigo-700 ring-indigo-200'}`}>
+            {typ.toUpperCase()}
+          </span>
+          {vl.map(v => formatJmeno(v.osoby)).join(' + ')}
+        </span>
+      )
+    }
+    // Podílové
+    if (typ === 'podilove') {
+      return (
+        <span className="text-zinc-700 text-sm">
+          {vl.map((v, i) => (
+            <span key={v.id}>{i > 0 && ', '}
+              {v.podil_citatel && v.podil_jmenovatel && (
+                <span className="text-zinc-400 text-xs mr-1">{v.podil_citatel}/{v.podil_jmenovatel}</span>
+              )}
+              {formatJmeno(v.osoby)}
+            </span>
+          ))}
+        </span>
+      )
+    }
+    // Individuální
+    return <span className="text-zinc-700 text-sm">{vl.map(v => formatJmeno(v.osoby)).join(', ')}</span>
   }
 
-  const inputCls = 'w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white'
-  const labelCls = 'block text-xs font-medium text-zinc-500 mb-1'
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full">
-      {/* Hlavní obsah */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Hlavička */}
-        <div className="px-8 pt-7 pb-5 border-b border-zinc-200 bg-stone-50">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-zinc-900 tracking-tight">Bytové jednotky</h1>
-              <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <span className="text-sm text-zinc-500">{celkem} celkem</span>
-                <span className="text-zinc-300">·</span>
-                <span className="inline-flex items-center gap-1.5 text-sm text-emerald-700 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400"></span>{sVlastnikem} obsazeno
-                </span>
-                <span className="text-zinc-300">·</span>
-                <span className="inline-flex items-center gap-1.5 text-sm text-amber-700 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-amber-400"></span>{sNajemnikem} s nájemníkem
-                </span>
-                <span className="text-zinc-300">·</span>
-                <span className="inline-flex items-center gap-1.5 text-sm text-zinc-400">
-                  <span className="w-2 h-2 rounded-full bg-zinc-300"></span>{celkem - sVlastnikem} volné
-                </span>
-              </div>
-            </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <Link href="/dashboard/jednotky/import"
-                className="flex items-center gap-1.5 border border-zinc-300 text-zinc-600 text-sm px-3.5 py-2 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                </svg>
-                Import
-              </Link>
-              <Link href="/dashboard/jednotky/nova"
-                className="flex items-center gap-1.5 bg-violet-600 text-white text-sm px-3.5 py-2 rounded-xl hover:bg-violet-700 transition-colors font-medium shadow-sm">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Přidat
-              </Link>
-            </div>
+    <div className="h-full flex flex-col">
+      {/* Hlavička */}
+      <div className="px-8 py-5 bg-white/80 backdrop-blur-sm border-b border-zinc-200 flex items-center justify-between flex-shrink-0">
+        <div>
+          <h1 className="text-xl font-bold text-zinc-900">Bytové jednotky</h1>
+          <div className="flex items-center gap-2 mt-1.5">
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-500 bg-zinc-100 px-2.5 py-1 rounded-lg">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+              {celkem} jednotek
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg ring-1 ring-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+              {obsazeno} obsazeno
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg ring-1 ring-amber-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+              {pronajato} pronajato
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 bg-zinc-100 px-2.5 py-1 rounded-lg">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+              {celkem - obsazeno} volné
+            </span>
           </div>
         </div>
+        <button
+          onClick={() => {/* TODO: přidat jednotku */}}
+          className="flex items-center gap-1.5 bg-zinc-950 text-white text-sm px-4 py-2 rounded-xl hover:bg-zinc-800 transition-colors font-medium"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
+          Přidat jednotku
+        </button>
+      </div>
 
-        {/* Tabulka */}
-        <div className="flex-1 overflow-hidden px-8 py-5">
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden h-full flex flex-col">
-            <div className="overflow-y-auto flex-1">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Číslo</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Patro</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Výměra</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Podíl</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Vlastník</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Stav</th>
-                    <th className="text-left px-4 py-3 text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Poznámka</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {jednotky.map((j) => {
-                    const vl = j.vlastnici.filter(v => v.je_aktivni)
-                    const maNaj = j.najemnici.some(n => n.je_aktivni)
+      {/* Tabulka */}
+      <div className="flex-1 overflow-hidden px-8 py-5">
+        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm h-full flex flex-col overflow-hidden">
+          <div className="overflow-y-auto flex-1">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-zinc-50 border-b border-zinc-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-20">Číslo</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-24">Patro</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-28">Plocha</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-28">Podíl</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Vlastník</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-40">Nájemník</th>
+                  <th className="text-center px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-24">Hlášeni</th>
+                  <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider w-32">Stav</th>
+                </tr>
+              </thead>
+              <tbody>
+                {jednotky.map(j => {
+                  const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
+                  const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
+                  const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
+                  const maNajemnika = !!naj
 
-                    return (
-                      <tr
-                        key={j.id}
-                        onClick={() => setVybranaId(j.id)}
-                        className="border-b border-zinc-100 cursor-pointer transition-colors hover:bg-zinc-50"
-                      >
-                        <td className="px-4 py-2.5">
-                          <span className="font-bold text-zinc-900">{j.cislo_jednotky}</span>
-                        </td>
-                        <td className="px-4 py-2.5 text-zinc-400 tabular-nums text-xs">{j.patro ?? '—'}</td>
-                        <td className="px-4 py-2.5 text-zinc-600 tabular-nums">{j.vymera_m2} m²</td>
-                        <td className="px-4 py-2.5 text-zinc-400 tabular-nums text-xs">{j.podil_citatel}/{j.podil_jmenovatel}</td>
-                        <td className="px-4 py-2.5">
-                          {vl.length === 0
-                            ? <span className="text-zinc-300 text-xs italic">—</span>
-                            : <span className="text-zinc-700">{vl.map((v, i) => <span key={i}>{i > 0 && ', '}{v.osoby.prijmeni}{v.osoby.jmeno ? ` ${v.osoby.jmeno}` : ''}</span>)}</span>
-                          }
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {maNaj
-                            ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Nájemník</span>
-                            : vl.length > 0
-                              ? <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Vlastník</span>
-                              : <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>Volné</span>
-                          }
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {j.poznamka && (
-                            <span title={j.poznamka} className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-zinc-100 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-600 transition-colors cursor-default">
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 4h10M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="px-4 py-2.5 border-t border-zinc-100 bg-zinc-50/50 text-xs text-zinc-400 flex justify-between">
-              <span>Celkem {celkem} jednotek</span>
-              <span>Kliknutím na řádek zobrazíte detail</span>
-            </div>
+                  return (
+                    <tr
+                      key={j.id}
+                      onClick={() => openModal(j.id)}
+                      className="border-b border-zinc-100 cursor-pointer transition-all hover:bg-violet-50/60 group"
+                    >
+                      <td className="px-4 py-3">
+                        <span className="font-bold text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-500">{j.patro ?? '—'}</td>
+                      <td className="px-4 py-3 text-zinc-600 tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : '—'}</td>
+                      <td className="px-4 py-3 text-zinc-400 tabular-nums text-xs">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : '—'}</td>
+                      <td className="px-4 py-3">{renderVlastnikCell(j)}</td>
+                      <td className="px-4 py-3">
+                        {naj ? <span className="text-zinc-700 text-sm">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300 italic text-xs">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {pocetBydlici > 0
+                          ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{pocetBydlici}</span>
+                          : <span className="text-zinc-300 text-xs">—</span>
+                        }
+                      </td>
+                      <td className="px-4 py-3">
+                        {maNajemnika
+                          ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-amber-200"><span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Pronajato</span>
+                          : maVlastnika
+                            ? <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Obsazeno</span>
+                            : <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-400"><span className="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>Volné</span>
+                        }
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-2.5 border-t border-zinc-100 bg-zinc-50/50 text-xs text-zinc-400 flex justify-between flex-shrink-0">
+            <span>Celkem {celkem} jednotek</span>
+            <span>Kliknutím na řádek zobrazíte detail</span>
           </div>
         </div>
       </div>
 
-      {/* Modal */}
-      {vybranaId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => { setVybranaId(null); setEditMode(false) }}>
+      {/* ─── Modal ─────────────────────────────────────────────────────────────── */}
+      {vybranaId && vybrana && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={closeModal}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div
-            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[88vh] overflow-hidden flex flex-col"
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
             onClick={e => e.stopPropagation()}
           >
             {/* Modal hlavička */}
-            <div className="bg-zinc-950 px-6 py-4 flex items-center justify-between flex-shrink-0">
+            <div className="bg-zinc-950 px-6 py-4 flex items-start justify-between flex-shrink-0">
               <div>
-                {(editMode || osobaView) && (
-                  <button
-                    onClick={() => { setEditMode(false); setOsobaView(null) }}
-                    className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1 transition-colors"
-                  >
+                {view !== 'detail' && (
+                  <button onClick={() => { setView('detail'); setChyba('') }}
+                    className="flex items-center gap-1 text-zinc-500 hover:text-zinc-300 text-xs mb-1.5 transition-colors">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-                    Zpět na detail jednotky
+                    Zpět na detail
                   </button>
                 )}
-                <p className="text-xs text-zinc-500 uppercase tracking-widest">
-                  {osobaView ? 'Osoba' : editMode ? 'Úprava' : 'Bytová jednotka'}
+                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                  {view === 'detail' ? 'Bytová jednotka' : view === 'edit' ? 'Úprava jednotky' : view === 'add-vlastnik' ? 'Přidat vlastníka' : view === 'add-najemnik' ? 'Přidat nájemníka' : 'Přidat osobu k pobytu'}
                 </p>
-                <p className="text-2xl font-bold text-white">
-                  {osobaView
-                    ? [osobaView.prijmeni, osobaView.jmeno].filter(Boolean).join(' ')
-                    : detail?.jednotka.cislo_jednotky ?? '...'}
-                </p>
+                <p className="text-2xl font-bold text-white mt-0.5">{vybrana.cislo_jednotky}</p>
+                {vybrana.ulice_vchodu && <p className="text-xs text-zinc-500 mt-0.5">{vybrana.ulice_vchodu}</p>}
               </div>
-              <button
-                onClick={() => { setVybranaId(null); setEditMode(false); setOsobaView(null) }}
-                className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+              <button onClick={closeModal}
+                className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors mt-1">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
             </div>
 
             {/* Modal tělo */}
             <div className="flex-1 overflow-y-auto">
-              {nacitaniDetail || nacitaniOsoby ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-7 h-7 border-2 border-violet-200 border-t-violet-600 rounded-full animate-spin" />
-                </div>
-              ) : osobaView ? (
-                /* ── Pohled osoby ── */
+
+              {/* ── DETAIL ── */}
+              {view === 'detail' && (
                 <div>
+                  {/* Info dlaždice */}
                   <div className="px-6 py-5 border-b border-zinc-100">
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
-                    <div className="space-y-2">
-                      {osobaView.email && (
-                        <div className="flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3">
-                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          <span className="text-sm text-zinc-700">{osobaView.email}</span>
-                        </div>
-                      )}
-                      {osobaView.telefon && (
-                        <div className="flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3">
-                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          <span className="text-sm text-zinc-700">{osobaView.telefon}</span>
-                        </div>
-                      )}
-                      {osobaView.adresa_ulice && (
-                        <div className="flex items-start gap-3 bg-zinc-50 rounded-xl px-4 py-3">
-                          <svg className="w-4 h-4 text-zinc-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          <div>
-                            <p className="text-sm text-zinc-700">{osobaView.adresa_ulice}</p>
-                            {osobaView.adresa_mesto && <p className="text-xs text-zinc-500 mt-0.5">{osobaView.adresa_psc} {osobaView.adresa_mesto}</p>}
-                          </div>
-                        </div>
-                      )}
-                      {!osobaView.email && !osobaView.telefon && !osobaView.adresa_ulice && (
-                        <p className="text-sm text-zinc-400 italic">Žádné kontaktní údaje</p>
-                      )}
-                    </div>
-                    {osobaView.poznamka && (
-                      <p className="text-xs text-zinc-500 mt-3 bg-zinc-50 rounded-xl px-4 py-3">{osobaView.poznamka}</p>
-                    )}
-                  </div>
-
-                  {osobaView.jakoVlastnik.length > 0 && (
-                    <div className="px-6 py-5 border-b border-zinc-100">
-                      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Vlastník jednotky</p>
-                      <div className="space-y-2">
-                        {osobaView.jakoVlastnik.map(v => (
-                          <div key={v.id} className="flex items-center justify-between bg-emerald-50 rounded-xl px-4 py-3 ring-1 ring-emerald-100">
-                            <span className="text-sm font-semibold text-zinc-900">Jednotka {v.jednotky.cislo_jednotky}</span>
-                            <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">vlastník</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {osobaView.jakoNajemnik.length > 0 && (
-                    <div className="px-6 py-5 border-b border-zinc-100">
-                      <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-3">Nájemník v jednotce</p>
-                      <div className="space-y-2">
-                        {osobaView.jakoNajemnik.map(n => (
-                          <div key={n.id} className="flex items-center justify-between bg-amber-50 rounded-xl px-4 py-3 ring-1 ring-amber-100">
-                            <span className="text-sm font-semibold text-zinc-900">Jednotka {n.jednotky.cislo_jednotky}</span>
-                            <span className="text-xs font-medium text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">nájemník</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : detail && editMode ? (
-                /* ── Edit formulář ── */
-                <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>Číslo jednotky *</label>
-                      <input
-                        value={editForm.cislo_jednotky}
-                        onChange={e => setEditForm(p => ({ ...p, cislo_jednotky: e.target.value }))}
-                        required className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Patro</label>
-                      <input
-                        type="number"
-                        value={editForm.patro}
-                        onChange={e => setEditForm(p => ({ ...p, patro: e.target.value }))}
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Výměra (m²) *</label>
-                    <input
-                      type="number" step="0.01"
-                      value={editForm.vymera_m2}
-                      onChange={e => setEditForm(p => ({ ...p, vymera_m2: e.target.value }))}
-                      required className={inputCls}
-                    />
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Vlastnický podíl *</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={editForm.podil_citatel}
-                        onChange={e => setEditForm(p => ({ ...p, podil_citatel: e.target.value }))}
-                        required placeholder="čitatel" className={inputCls}
-                      />
-                      <span className="text-zinc-300 text-xl font-light flex-shrink-0">/</span>
-                      <input
-                        type="number"
-                        value={editForm.podil_jmenovatel}
-                        onChange={e => setEditForm(p => ({ ...p, podil_jmenovatel: e.target.value }))}
-                        required placeholder="jmenovatel" className={inputCls}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className={labelCls}>Poznámka</label>
-                    <textarea
-                      value={editForm.poznamka}
-                      onChange={e => setEditForm(p => ({ ...p, poznamka: e.target.value }))}
-                      rows={3}
-                      className={inputCls + ' resize-none'}
-                    />
-                  </div>
-
-                  {editChyba && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">{editChyba}</div>
-                  )}
-
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="submit"
-                      disabled={editUkladani}
-                      className="flex-1 bg-violet-600 text-white text-sm py-2.5 rounded-xl hover:bg-violet-700 transition-colors font-medium disabled:opacity-50"
-                    >
-                      {editUkladani ? 'Ukládám...' : 'Uložit změny'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditMode(false)}
-                      className="flex-1 border border-zinc-300 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium"
-                    >
-                      Zrušit
-                    </button>
-                  </div>
-                </form>
-              ) : detail && (
-                /* ── Detail pohled ── */
-                <div>
-                  {/* Základní info */}
-                  <div className="px-6 py-5 border-b border-zinc-100">
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-2">
                       {[
-                        { l: 'Patro', v: detail.jednotka.patro ?? '—' },
-                        { l: 'Výměra', v: `${detail.jednotka.vymera_m2} m²` },
-                        { l: 'Podíl', v: `${detail.jednotka.podil_citatel}/${detail.jednotka.podil_jmenovatel}` },
+                        { l: 'Patro', v: vybrana.patro ?? '—' },
+                        { l: 'Plocha', v: vybrana.uzitna_plocha ? `${vybrana.uzitna_plocha} m²` : '—' },
+                        { l: 'Podíl', v: vybrana.podil_citatel ? `${vybrana.podil_citatel}/${vybrana.podil_jmenovatel}` : '—' },
+                        { l: 'Pokojů', v: vybrana.pocet_pokoju ?? '—' },
                       ].map(({ l, v }) => (
-                        <div key={l} className="bg-zinc-50 rounded-xl px-4 py-3">
+                        <div key={l} className="bg-zinc-50 rounded-xl px-3 py-2.5">
                           <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide">{l}</p>
                           <p className="text-sm font-semibold text-zinc-900 mt-0.5">{v}</p>
                         </div>
                       ))}
                     </div>
-                    {detail.jednotka.poznamka && (
-                      <p className="text-xs text-zinc-500 mt-3 bg-zinc-50 rounded-xl px-4 py-3">{detail.jednotka.poznamka}</p>
-                    )}
+                    {vybrana.poznamka && <p className="mt-3 text-xs text-zinc-500 bg-zinc-50 rounded-xl px-3 py-2.5">{vybrana.poznamka}</p>}
                   </div>
 
                   {/* Vlastníci */}
-                  <div className="px-6 py-5 border-b border-zinc-100">
+                  <div className="px-6 py-4 border-b border-zinc-100">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Vlastník</p>
-                      <button
-                        onClick={() => { setFormVlastnik(!formVlastnik); setFormNajemnik(false) }}
-                        className="text-xs text-violet-600 hover:text-violet-800 font-medium"
-                      >
-                        {formVlastnik ? 'Zrušit' : '+ Přidat'}
-                      </button>
+                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Vlastnictví</p>
+                      <button onClick={openAddVlastnik} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
                     </div>
-
-                    {formVlastnik && (
-                      <div className="bg-violet-50 rounded-xl p-4 mb-3 border border-violet-100 space-y-3">
-                        <div>
-                          <label className={labelCls}>Vyberte osobu</label>
-                          <select value={osobaVlastnik} onChange={e => setOsobaVlastnik(e.target.value)} className={inputCls}>
-                            <option value="">— vyberte osobu —</option>
-                            {osoby.map(o => (
-                              <option key={o.id} value={o.id}>{o.prijmeni}{o.jmeno ? ` ${o.jmeno}` : ''}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={labelCls}>Vlastník od</label>
-                          <input type="date" value={datumVlastnik} onChange={e => setDatumVlastnik(e.target.value)} className={inputCls} />
-                        </div>
-                        <button
-                          onClick={handlePridatVlastnika}
-                          disabled={!osobaVlastnik || ukladani}
-                          className="w-full bg-violet-600 text-white text-sm py-2 rounded-lg hover:bg-violet-700 transition-colors font-medium disabled:opacity-40"
-                        >
-                          {ukladani ? 'Ukládám...' : 'Přiřadit vlastníka'}
-                        </button>
-                      </div>
-                    )}
-
-                    {detail.vlastnici.length === 0 ? (
+                    {aktivniVlastnici.length === 0 ? (
                       <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
                     ) : (
                       <div className="space-y-2">
-                        {detail.vlastnici.map(v => (
-                          <div key={v.id} className="bg-zinc-50 rounded-xl p-3 flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold text-zinc-900 text-sm">{formatJmeno(v.osoby)}</p>
-                              {v.osoby.email && <p className="text-xs text-zinc-500 mt-0.5">{v.osoby.email}</p>}
-                              {v.osoby.telefon && <p className="text-xs text-zinc-500">{v.osoby.telefon}</p>}
-                              <p className="text-[10px] text-zinc-400 mt-1">od {v.datum_od}</p>
+                        {(() => {
+                          // Skupinové zobrazení SJM/MCP
+                          const typ = aktivniVlastnici[0].typ_vlastnictvi
+                          if (typ === 'sjm' || typ === 'mcp') {
+                            return (
+                              <div className="bg-zinc-50 rounded-xl p-3">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {typVlastnictviBadge(typ)}
+                                  <span className="text-xs text-zinc-400">{aktivniVlastnici[0].datum_od ? `od ${aktivniVlastnici[0].datum_od}` : ''}</span>
+                                </div>
+                                {aktivniVlastnici.map(v => (
+                                  <div key={v.id} className="flex items-center justify-between mt-1">
+                                    <span className="text-sm font-semibold text-zinc-900">{formatJmeno(v.osoby)}</span>
+                                    <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600">ukončit</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )
+                          }
+                          return aktivniVlastnici.map(v => (
+                            <div key={v.id} className="bg-zinc-50 rounded-xl p-3 flex items-center justify-between">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  {typVlastnictviBadge(v.typ_vlastnictvi)}
+                                  {v.podil_citatel && <span className="text-xs text-zinc-400 font-mono">{v.podil_citatel}/{v.podil_jmenovatel}</span>}
+                                  <span className="text-sm font-semibold text-zinc-900">{formatJmeno(v.osoby)}</span>
+                                </div>
+                                {v.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {v.datum_od}</p>}
+                              </div>
+                              <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">ukončit</button>
                             </div>
-                            <button onClick={() => openOsoba(v.osoby.id)} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</button>
+                          ))
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nájemník */}
+                  <div className="px-6 py-4 border-b border-zinc-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Nájemník</p>
+                      <button onClick={openAddNajemnik} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
+                    </div>
+                    {aktivniNajemnik.length === 0 ? (
+                      <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {aktivniNajemnik.map(n => (
+                          <div key={n.id} className="bg-amber-50 rounded-xl p-3 ring-1 ring-amber-100 flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-semibold text-zinc-900">{formatJmeno(n.osoby)}</p>
+                              {n.datum_od && <p className="text-[10px] text-zinc-400 mt-0.5">od {n.datum_od}</p>}
+                            </div>
+                            <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">ukončit</button>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Nájemníci */}
-                  <div className="px-6 py-5 border-b border-zinc-100">
+                  {/* Hlášeni k pobytu */}
+                  <div className="px-6 py-4 border-b border-zinc-100">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Nájemník</p>
-                      <button
-                        onClick={() => { setFormNajemnik(!formNajemnik); setFormVlastnik(false) }}
-                        className="text-xs text-violet-600 hover:text-violet-800 font-medium"
-                      >
-                        {formNajemnik ? 'Zrušit' : '+ Přidat'}
-                      </button>
+                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Hlášeni k pobytu</p>
+                      <button onClick={openAddBydlici} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
                     </div>
-
-                    {formNajemnik && (
-                      <div className="bg-amber-50 rounded-xl p-4 mb-3 border border-amber-100 space-y-3">
-                        <div>
-                          <label className={labelCls}>Vyberte osobu</label>
-                          <select value={osobaNajemnik} onChange={e => setOsobaNajemnik(e.target.value)} className={inputCls}>
-                            <option value="">— vyberte osobu —</option>
-                            {osoby.map(o => (
-                              <option key={o.id} value={o.id}>{o.prijmeni}{o.jmeno ? ` ${o.jmeno}` : ''}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className={labelCls}>Nájemník od</label>
-                          <input type="date" value={datumNajemnik} onChange={e => setDatumNajemnik(e.target.value)} className={inputCls} />
-                        </div>
-                        <button
-                          onClick={handlePridatNajemnika}
-                          disabled={!osobaNajemnik || ukladani}
-                          className="w-full bg-amber-600 text-white text-sm py-2 rounded-lg hover:bg-amber-700 transition-colors font-medium disabled:opacity-40"
-                        >
-                          {ukladani ? 'Ukládám...' : 'Přiřadit nájemníka'}
-                        </button>
-                      </div>
-                    )}
-
-                    {detail.najemnici.length === 0 ? (
-                      <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
+                    {aktivniBydlici.length === 0 ? (
+                      <p className="text-sm text-zinc-400 italic">Nikdo není hlášen</p>
                     ) : (
-                      <div className="space-y-2">
-                        {detail.najemnici.map(n => (
-                          <div key={n.id} className="bg-amber-50 rounded-xl p-3 ring-1 ring-amber-100 flex items-start justify-between">
-                            <div>
-                              <p className="font-semibold text-zinc-900 text-sm">{formatJmeno(n.osoby)}</p>
-                              {n.osoby.email && <p className="text-xs text-zinc-500 mt-0.5">{n.osoby.email}</p>}
-                              {n.osoby.telefon && <p className="text-xs text-zinc-500">{n.osoby.telefon}</p>}
-                              <p className="text-[10px] text-zinc-400 mt-1">od {n.datum_od}</p>
-                            </div>
-                            <button onClick={() => openOsoba(n.osoby.id)} className="text-xs text-violet-600 hover:text-violet-800 flex-shrink-0 ml-3 mt-0.5">detail →</button>
+                      <div className="space-y-1.5">
+                        {aktivniBydlici.map(b => (
+                          <div key={b.id} className="bg-blue-50 rounded-xl px-3 py-2.5 ring-1 ring-blue-100 flex items-center justify-between">
+                            <span className="text-sm font-semibold text-zinc-900">{formatJmeno(b.osoby)}</span>
+                            <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[10px] text-red-400 hover:text-red-600 flex-shrink-0 ml-2">odhlásit</button>
                           </div>
                         ))}
                       </div>
@@ -690,43 +559,195 @@ export default function JednotkyClient({ jednotky }: { jednotky: Jednotka[] }) {
 
                   {/* Akce */}
                   <div className="px-6 py-5 space-y-2">
-                    <button
-                      onClick={openEdit}
-                      className="flex items-center justify-center gap-2 w-full border border-zinc-300 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                      </svg>
+                    <button onClick={openEdit}
+                      className="flex items-center justify-center gap-2 w-full border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       Upravit jednotku
                     </button>
-
-                    {potvrzeniSmazani ? (
+                    {potvrzeni ? (
                       <div className="flex gap-2">
-                        <button
-                          onClick={handleSmazat}
-                          disabled={mazani}
-                          className="flex-1 bg-red-600 text-white text-sm py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50"
-                        >
+                        <button onClick={handleSmazat} disabled={mazani}
+                          className="flex-1 bg-red-600 text-white text-sm py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50">
                           {mazani ? 'Mažu...' : 'Potvrdit smazání'}
                         </button>
-                        <button
-                          onClick={() => setPotvrzeniSmazani(false)}
-                          className="flex-1 border border-zinc-300 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors"
-                        >
+                        <button onClick={() => setPotvrzeni(false)}
+                          className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
                           Zrušit
                         </button>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => setPotvrzeniSmazani(true)}
-                        className="w-full border border-red-200 text-red-600 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium"
-                      >
+                      <button onClick={() => setPotvrzeni(true)}
+                        className="w-full border border-red-200 text-red-500 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium">
                         Smazat jednotku
                       </button>
                     )}
                   </div>
                 </div>
               )}
+
+              {/* ── EDIT ── */}
+              {view === 'edit' && (
+                <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={LABEL}>Číslo jednotky *</label>
+                      <input value={editForm.cislo_jednotky} onChange={e => setEditForm(p => ({ ...p, cislo_jednotky: e.target.value }))} required className={INPUT} />
+                    </div>
+                    <div>
+                      <label className={LABEL}>Patro</label>
+                      <input type="number" value={editForm.patro} onChange={e => setEditForm(p => ({ ...p, patro: e.target.value }))} className={INPUT} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={LABEL}>Ulice vchodu</label>
+                    <input value={editForm.ulice_vchodu} onChange={e => setEditForm(p => ({ ...p, ulice_vchodu: e.target.value }))} className={INPUT} placeholder="Spojovací 557/A" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={LABEL}>Užitná plocha (m²)</label>
+                      <input type="number" step="0.01" value={editForm.uzitna_plocha} onChange={e => setEditForm(p => ({ ...p, uzitna_plocha: e.target.value }))} className={INPUT} />
+                    </div>
+                    <div>
+                      <label className={LABEL}>Vytápěná plocha (m²)</label>
+                      <input type="number" step="0.01" value={editForm.vytapena_plocha} onChange={e => setEditForm(p => ({ ...p, vytapena_plocha: e.target.value }))} className={INPUT} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={LABEL}>Vlastnický podíl (čitatel)</label>
+                      <input type="number" value={editForm.podil_citatel} onChange={e => setEditForm(p => ({ ...p, podil_citatel: e.target.value }))} className={INPUT} placeholder="135" />
+                    </div>
+                    <div>
+                      <label className={LABEL}>Jmenovatel</label>
+                      <input type="number" value={editForm.podil_jmenovatel} onChange={e => setEditForm(p => ({ ...p, podil_jmenovatel: e.target.value }))} className={INPUT} placeholder="10000" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={LABEL}>Počet pokojů</label>
+                      <input type="number" value={editForm.pocet_pokoju} onChange={e => setEditForm(p => ({ ...p, pocet_pokoju: e.target.value }))} className={INPUT} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={LABEL}>Poznámka</label>
+                    <textarea value={editForm.poznamka} onChange={e => setEditForm(p => ({ ...p, poznamka: e.target.value }))} rows={3} className={INPUT + ' resize-none'} />
+                  </div>
+                  {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
+                  <div className="flex gap-2 pt-1">
+                    <button type="submit" disabled={ukladani}
+                      className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-50">
+                      {ukladani ? 'Ukládám...' : 'Uložit změny'}
+                    </button>
+                    <button type="button" onClick={() => setView('detail')}
+                      className="flex-1 border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors">
+                      Zrušit
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* ── ADD VLASTNÍK ── */}
+              {view === 'add-vlastnik' && (
+                <form onSubmit={handleAddVlastnik} className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className={LABEL}>Typ vlastnictví</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['individualni', 'podilove', 'sjm', 'mcp'] as const).map(t => (
+                        <button key={t} type="button" onClick={() => setAvTyp(t)}
+                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${avTyp === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
+                          {t === 'individualni' ? 'Individuální' : t === 'podilove' ? 'Podílové' : t.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={LABEL}>{avTyp === 'sjm' || avTyp === 'mcp' ? 'Osoba 1' : 'Osoba'}</label>
+                    <select value={avOsoba1} onChange={e => setAvOsoba1(e.target.value)} required className={INPUT}>
+                      <option value="">— vyberte osobu —</option>
+                      {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                    </select>
+                  </div>
+
+                  {avTyp === 'podilove' && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={LABEL}>Podíl – čitatel</label>
+                        <input type="number" value={avPodilC} onChange={e => setAvPodilC(e.target.value)} placeholder="1" className={INPUT} />
+                      </div>
+                      <div>
+                        <label className={LABEL}>Jmenovatel</label>
+                        <input type="number" value={avPodilJ} onChange={e => setAvPodilJ(e.target.value)} placeholder="2" className={INPUT} />
+                      </div>
+                    </div>
+                  )}
+
+                  {(avTyp === 'sjm' || avTyp === 'mcp' || avTyp === 'podilove') && (
+                    <div>
+                      <label className={LABEL}>Osoba 2</label>
+                      <select value={avOsoba2} onChange={e => setAvOsoba2(e.target.value)} className={INPUT}>
+                        <option value="">— vyberte osobu —</option>
+                        {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                      </select>
+                    </div>
+                  )}
+
+                  {avTyp === 'podilove' && avOsoba2 && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className={LABEL}>Podíl osoby 2 – čitatel</label>
+                        <input type="number" value={avPodilC2} onChange={e => setAvPodilC2(e.target.value)} className={INPUT} />
+                      </div>
+                      <div>
+                        <label className={LABEL}>Jmenovatel</label>
+                        <input type="number" value={avPodilJ2} onChange={e => setAvPodilJ2(e.target.value)} className={INPUT} />
+                      </div>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className={LABEL}>Vlastník od</label>
+                    <input type="date" value={avDatum} onChange={e => setAvDatum(e.target.value)} className={INPUT} />
+                  </div>
+                  {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={ukladani || !avOsoba1}
+                      className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
+                      {ukladani ? 'Ukládám...' : 'Přiřadit vlastníka'}
+                    </button>
+                    <button type="button" onClick={() => setView('detail')}
+                      className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
+                  </div>
+                </form>
+              )}
+
+              {/* ── ADD NÁJEMNÍK / BYDLÍCÍ ── */}
+              {(view === 'add-najemnik' || view === 'add-bydlici') && (
+                <div className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className={LABEL}>Osoba</label>
+                    <select value={anOsoba} onChange={e => setAnOsoba(e.target.value)} className={INPUT}>
+                      <option value="">— vyberte osobu —</option>
+                      {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={LABEL}>{view === 'add-najemnik' ? 'Nájemník od' : 'Hlášen od'}</label>
+                    <input type="date" value={anDatum} onChange={e => setAnDatum(e.target.value)} className={INPUT} />
+                  </div>
+                  {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
+                  <div className="flex gap-2">
+                    <button onClick={() => handleAddVazba(view === 'add-najemnik' ? 'najemnik' : 'bydlici')}
+                      disabled={ukladani || !anOsoba}
+                      className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
+                      {ukladani ? 'Ukládám...' : view === 'add-najemnik' ? 'Přiřadit nájemníka' : 'Přidat k pobytu'}
+                    </button>
+                    <button onClick={() => setView('detail')}
+                      className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
+                  </div>
+                </div>
+              )}
+
             </div>
           </div>
         </div>

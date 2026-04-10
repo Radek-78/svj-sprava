@@ -8,9 +8,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
   if (!user) redirect('/login')
 
   return (
-    <div className="flex flex-col h-screen bg-stone-50 overflow-hidden">
+    <div className="flex flex-col h-screen overflow-hidden">
       <TopNav email={user.email ?? ''} />
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-hidden bg-dot-pattern">
         {children}
       </main>
     </div>
