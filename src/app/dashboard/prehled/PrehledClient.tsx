@@ -13,7 +13,7 @@ type VyborClen = {
   jmeno_externi: string | null
   email: string | null
   telefon: string | null
-  osoby?: { id: string; jmeno: string | null; prijmeni: string } | null
+  osoby?: { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null } | null
 }
 
 type AuthUser = {
@@ -58,6 +58,16 @@ const ROLE_COLORS: Record<string, string> = {
 function getJmeno(clen: VyborClen): string {
   if (clen.osoby) return [clen.osoby.prijmeni, clen.osoby.jmeno].filter(Boolean).join(' ')
   return clen.jmeno_externi ?? '(neuvedeno)'
+}
+
+function getClenEmail(clen: VyborClen): string | null {
+  if (clen.osoby) return clen.osoby.email ?? null
+  return clen.email
+}
+
+function getClenTelefon(clen: VyborClen): string | null {
+  if (clen.osoby) return clen.osoby.mobil ?? clen.osoby.telefon ?? null
+  return clen.telefon
 }
 
 function formatDate(d: string | null): string {
@@ -326,12 +336,12 @@ export default function PrehledClient({
                               {ROLE_LABELS[clen.role]}
                             </span>
                           </div>
-                          {clen.email && (
-                            <a href={`mailto:${clen.email}`} className="text-xs text-zinc-400 hover:text-violet-600 transition-colors mt-0.5 block">
-                              {clen.email}
+                          {getClenEmail(clen) && (
+                            <a href={`mailto:${getClenEmail(clen)}`} className="text-xs text-zinc-400 hover:text-violet-600 transition-colors mt-0.5 block">
+                              {getClenEmail(clen)}
                             </a>
                           )}
-                          {clen.telefon && <p className="text-xs text-zinc-400 mt-0.5">{clen.telefon}</p>}
+                          {getClenTelefon(clen) && <p className="text-xs text-zinc-400 mt-0.5">{getClenTelefon(clen)}</p>}
                         </div>
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">
@@ -452,15 +462,7 @@ export default function PrehledClient({
               ) : (
                 <select
                   value={form.osoba_id}
-                  onChange={e => {
-                    const osoba = vsechnyOsoby.find(o => o.id === e.target.value)
-                    setForm(p => ({
-                      ...p,
-                      osoba_id: e.target.value,
-                      email: osoba?.email ?? p.email,
-                      telefon: osoba?.mobil ?? osoba?.telefon ?? p.telefon,
-                    }))
-                  }}
+                  onChange={e => setForm(p => ({ ...p, osoba_id: e.target.value }))}
                   className={INPUT}
                 >
                   <option value="">— vyberte osobu —</option>
@@ -471,18 +473,24 @@ export default function PrehledClient({
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={LABEL}>E-mail</label>
-                <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                  placeholder="jan@email.cz" className={INPUT} />
+            {form.isExternal ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={LABEL}>E-mail</label>
+                  <input type="email" value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                    placeholder="jan@email.cz" className={INPUT} />
+                </div>
+                <div>
+                  <label className={LABEL}>Telefon</label>
+                  <input value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))}
+                    placeholder="+420 000 000 000" className={INPUT} />
+                </div>
               </div>
-              <div>
-                <label className={LABEL}>Telefon</label>
-                <input value={form.telefon} onChange={e => setForm(p => ({ ...p, telefon: e.target.value }))}
-                  placeholder="+420 000 000 000" className={INPUT} />
-              </div>
-            </div>
+            ) : (
+              <p className="text-xs text-zinc-400 bg-zinc-50 rounded-lg px-3 py-2.5">
+                Kontaktní údaje se přebírají automaticky z karty osoby.
+              </p>
+            )}
 
             {formError && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{formError}</p>}
 
