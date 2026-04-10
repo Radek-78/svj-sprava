@@ -103,7 +103,7 @@ export default function PrehledClient({
 }) {
   const [vybor, setVybor] = useState(initialVybor)
   const [nastaveni, setNastaveni] = useState(initialNastaveni)
-  const [vsechnyOsoby, setVsechnyOsoby] = useState<{ id: string; jmeno: string | null; prijmeni: string }[]>([])
+  const [vsechnyOsoby, setVsechnyOsoby] = useState<{ id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null }[]>([])
 
   // Auth uživatelé
   const [users, setUsers] = useState<AuthUser[]>([])
@@ -156,7 +156,7 @@ export default function PrehledClient({
   // Načíst osoby pro formulář výboru
   useEffect(() => {
     if (vyborOpen) {
-      supabase.from('osoby').select('id, jmeno, prijmeni').order('prijmeni')
+      supabase.from('osoby').select('id, jmeno, prijmeni, email, telefon, mobil').order('prijmeni')
         .then(({ data }) => setVsechnyOsoby(data ?? []))
     }
   }, [vyborOpen])
@@ -450,7 +450,19 @@ export default function PrehledClient({
                 <input value={form.jmeno_externi} onChange={e => setForm(p => ({ ...p, jmeno_externi: e.target.value }))}
                   placeholder="Jméno a příjmení" className={INPUT} />
               ) : (
-                <select value={form.osoba_id} onChange={e => setForm(p => ({ ...p, osoba_id: e.target.value }))} className={INPUT}>
+                <select
+                  value={form.osoba_id}
+                  onChange={e => {
+                    const osoba = vsechnyOsoby.find(o => o.id === e.target.value)
+                    setForm(p => ({
+                      ...p,
+                      osoba_id: e.target.value,
+                      email: osoba?.email ?? p.email,
+                      telefon: osoba?.mobil ?? osoba?.telefon ?? p.telefon,
+                    }))
+                  }}
+                  className={INPUT}
+                >
                   <option value="">— vyberte osobu —</option>
                   {vsechnyOsoby.map(o => (
                     <option key={o.id} value={o.id}>{[o.prijmeni, o.jmeno].filter(Boolean).join(' ')}</option>
