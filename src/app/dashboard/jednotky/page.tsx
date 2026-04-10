@@ -12,6 +12,10 @@ export default async function JednotkyPage({ searchParams }: { searchParams: Pro
       jednotky_osoby(
         id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni,
         osoby(id, jmeno, prijmeni)
+      ),
+      jednotky_cipy(
+        id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani,
+        osoby(id, jmeno, prijmeni)
       )
     `)
     .order('cislo_jednotky')
