@@ -532,7 +532,25 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       {potvrzeni ? (
                          <div className="flex gap-2">
                            <button onClick={handleSmazat} disabled={mazani}
-                             className="flex-1 bg-red-600 text-white text-xs py-3 rounded-2xl hover:bg                  <div className="flex-1 overflow-y-auto border-r border-zinc-100 bg-white">
+                             className="flex-1 bg-red-600 text-white text-[10px] py-2.5 rounded-xl hover:bg-red-700 transition-all font-bold disabled:opacity-50 shadow-md shadow-red-100">
+                             {mazani ? 'Mažu...' : 'Potvrdit'}
+                           </button>
+                           <button onClick={() => setPotvrzeni(false)}
+                             className="flex-1 bg-white border border-zinc-200 text-zinc-600 text-[10px] py-2.5 rounded-xl hover:bg-zinc-50 transition-all font-bold">
+                             Zrušit
+                           </button>
+                         </div>
+                       ) : (
+                         <button onClick={() => setPotvrzeni(true)}
+                           className="w-full border border-red-100 text-red-500 text-xs py-2.5 rounded-xl hover:bg-red-50 transition-all font-bold">
+                           Smazat jednotku
+                         </button>
+                       )}
+                    </div>
+                  </div>
+
+                  {/* 2. SLOUPEC: Osoby (flex-1) */}
+                  <div className="flex-1 overflow-y-auto border-r border-zinc-100 bg-white">
                     {/* Vlastnictví */}
                     <div className="px-6 py-4 border-b border-zinc-100">
                       <div className="flex items-center justify-between mb-3">
