@@ -357,9 +357,12 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.3)' }}
-          onClick={e => { if (e.target === e.currentTarget) closeModal() }}
+          onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+            onMouseDown={e => e.stopPropagation()}
+          >
 
             {/* Hlavička */}
             <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between flex-shrink-0">
