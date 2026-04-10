@@ -594,8 +594,8 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
                     )}
                   </div>
 
-                  </div>{/* konec pravého panelu */}
-                </div>{/* konec dvoupanelového layoutu */}
+                  </div>
+                </div>
               )}
 
               {/* ── EDIT ── */}
