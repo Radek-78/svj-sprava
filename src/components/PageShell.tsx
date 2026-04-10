@@ -65,7 +65,7 @@ export default function PageShell({ title, stats, actions, children }: PageShell
       </div>
 
       {/* Obsah */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto bg-white">
         {children}
       </div>
 
@@ -101,7 +101,7 @@ export function PageTh({ children, center }: { children: React.ReactNode; center
 
 export function PageTbody({ children }: { children: React.ReactNode }) {
   return (
-    <tbody className="divide-y divide-zinc-100">
+    <tbody>
       {children}
     </tbody>
   )
@@ -111,7 +111,7 @@ export function PageTr({ onClick, children }: { onClick: () => void; children: R
   return (
     <tr
       onClick={onClick}
-      className="hover:bg-violet-50/50 cursor-pointer transition-colors group"
+      className="odd:bg-white even:bg-zinc-50 hover:bg-violet-50 cursor-pointer transition-colors group border-b border-zinc-100 last:border-0"
     >
       {children}
     </tr>
