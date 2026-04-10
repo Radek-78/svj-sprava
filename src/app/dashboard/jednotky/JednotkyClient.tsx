@@ -8,7 +8,15 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string }
-type Cip = { id: string; cislo_cipu: string; poznamka: string | null }
+type Cip = { 
+  id: string; 
+  cislo_cipu: string; 
+  poznamka: string | null; 
+  osoba_id: string | null; 
+  externi_prijemce: string | null; 
+  datum_predani: string | null;
+  osoby?: Osoba | null;
+}
 
 type Vazba = {
   id: string
@@ -123,6 +131,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   // Add čip form
   const [acCislo, setAcCislo] = useState('')
   const [acPoznamka, setAcPoznamka] = useState('')
+  const [acTypPrijemce, setAcTypPrijemce] = useState<'osoba' | 'externi'>('osoba')
+  const [acOsobaId, setAcOsobaId] = useState('')
+  const [acExterniJmeno, setAcExterniJmeno] = useState('')
+  const [acDatum, setAcDatum] = useState(new Date().toISOString().split('T')[0])
 
   const router = useRouter()
   const supabase = createClient()
@@ -158,7 +170,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const refreshJednotky = useCallback(async () => {
     const { data } = await supabase
       .from('jednotky')
-      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), jednotky_cipy(id, cislo_cipu, poznamka)`)
+      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), jednotky_cipy(id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, osoby(id, jmeno, prijmeni))`)
       .order('cislo_jednotky')
     if (data) setJednotky(data as unknown as Jednotka[])
   }, [])
@@ -214,7 +226,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   }
 
   function openAddCip() {
-    setAcCislo(''); setAcPoznamka('')
+    setAcCislo(''); setAcPoznamka(''); setAcTypPrijemce('osoba'); setAcOsobaId(''); setAcExterniJmeno('')
+    setAcDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-cip')
   }
 
@@ -289,7 +302,12 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     if (!vybranaId || !acCislo) return
     setUkladani(true); setChyba('')
     const { error } = await supabase.from('jednotky_cipy').insert({
-      jednotka_id: vybranaId, cislo_cipu: acCislo, poznamka: acPoznamka || null,
+      jednotka_id: vybranaId, 
+      cislo_cipu: acCislo, 
+      poznamka: acPoznamka || null,
+      osoba_id: acTypPrijemce === 'osoba' ? (acOsobaId || null) : null,
+      externi_prijemce: acTypPrijemce === 'externi' ? (acExterniJmeno || null) : null,
+      datum_predani: acDatum || null,
     })
     if (error) { setChyba(error.message); setUkladani(false); return }
     await refreshJednotky()
@@ -648,10 +666,20 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                         {vybrana.jednotky_cipy?.map(c => (
                           <div key={c.id} className="bg-zinc-50 rounded-xl px-3 py-2.5 ring-1 ring-zinc-100 flex items-center justify-between">
                             <div className="min-w-0">
-                              <span className="text-sm font-mono font-bold text-zinc-900">{c.cislo_cipu}</span>
-                              {c.poznamka && <p className="text-[10px] text-zinc-400 truncate">{c.poznamka}</p>}
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-mono font-bold text-zinc-900">{c.cislo_cipu}</span>
+                                  <span className="text-xs text-zinc-600 truncate">
+                                    — {c.osoby ? formatJmeno(c.osoby) : c.externi_prijemce || 'neuvedeno'}
+                                  </span>
+                                </div>
+                                {(c.datum_predani || c.poznamka) && (
+                                  <div className="flex items-center gap-2 mt-0.5">
+                                    {c.datum_predani && <span className="text-[10px] text-zinc-400 italic">předáno {c.datum_predani}</span>}
+                                    {c.poznamka && <span className="text-[10px] text-zinc-400 truncate">• {c.poznamka}</span>}
+                                  </div>
+                                )}
                             </div>
-                            <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-400 hover:text-red-500 transition-colors ml-2 p-1">
+                            <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-400 hover:text-red-500 transition-colors ml-2 p-1 flex-shrink-0">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                             </button>
                           </div>
@@ -853,19 +881,48 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
               {view === 'add-cip' && (
                 <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleAddCip} className="px-6 py-5 space-y-4">
-                  <div>
-                    <label className={LABEL}>Číslo čipu *</label>
-                    <input value={acCislo} onChange={e => setAcCislo(e.target.value)} required placeholder="např. 042" className={INPUT} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={LABEL}>Číslo čipu *</label>
+                      <input value={acCislo} onChange={e => setAcCislo(e.target.value)} required placeholder="např. 042" className={INPUT} />
+                    </div>
+                    <div>
+                      <label className={LABEL}>Datum předání</label>
+                      <input type="date" value={acDatum} onChange={e => setAcDatum(e.target.value)} className={INPUT} />
+                    </div>
                   </div>
+
+                  <div>
+                    <label className={LABEL}>Předáno komu</label>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {(['osoba', 'externi'] as const).map(t => (
+                        <button key={t} type="button" onClick={() => setAcTypPrijemce(t)}
+                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${acTypPrijemce === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
+                          {t === 'osoba' ? 'Osoba ze seznamu' : 'Externí osoba'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {acTypPrijemce === 'osoba' ? (
+                      <select value={acOsobaId} onChange={e => setAcOsobaId(e.target.value)} className={INPUT}>
+                        <option value="">— vyberte osobu —</option>
+                        {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                      </select>
+                    ) : (
+                      <input value={acExterniJmeno} onChange={e => setAcExterniJmeno(e.target.value)} placeholder="Jméno externí osoby" className={INPUT} />
+                    )}
+                  </div>
+
                   <div>
                     <label className={LABEL}>Poznámka</label>
-                    <input value={acPoznamka} onChange={e => setAcPoznamka(e.target.value)} placeholder="např. předáno 10.4." className={INPUT} />
+                    <input value={acPoznamka} onChange={e => setAcPoznamka(e.target.value)} placeholder="např. vráceno při opravě" className={INPUT} />
                   </div>
+
                   {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
                   <div className="flex gap-2">
                     <button type="submit" disabled={ukladani || !acCislo}
                       className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
-                      {ukladani ? 'Ukládám...' : 'Přidat čip'}
+                      {ukladani ? 'Ukládám...' : 'Uložit čip'}
                     </button>
                     <button type="button" onClick={() => setView('detail')}
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
