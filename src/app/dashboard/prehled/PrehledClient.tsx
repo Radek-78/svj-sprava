@@ -173,7 +173,7 @@ export default function PrehledClient({
 
   // Refresh výboru ze Supabase
   async function refreshVybor() {
-    const { data } = await supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni)').order('poradi')
+    const { data } = await supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni, email, telefon, mobil)').order('poradi')
     setVybor(data ?? [])
   }
 
