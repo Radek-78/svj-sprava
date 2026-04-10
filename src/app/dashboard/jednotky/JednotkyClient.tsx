@@ -763,7 +763,17 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                 <div className="px-6 py-5 space-y-4">
                   <div>
                     <label className={LABEL}>Osoba</label>
-                    <select value={anOsoba} onChange={e => setAnOsoba(e.target.value)} className={INPUT}>
+                    <select
+                      value={anOsoba}
+                      onChange={e => {
+                        const sid = e.target.value
+                        setAnOsoba(sid)
+                        const vl = aktivniVlastnici.find(v => v.osoby.id === sid)
+                        if (vl?.datum_od) setAnDatum(vl.datum_od)
+                        else setAnDatum(new Date().toISOString().split('T')[0])
+                      }}
+                      className={INPUT}
+                    >
                       <option value="">— vyberte osobu —</option>
                       {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
                     </select>
