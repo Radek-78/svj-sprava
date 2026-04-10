@@ -8,6 +8,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string }
+type Cip = { id: string; cislo_cipu: string; poznamka: string | null }
 
 type Vazba = {
   id: string
@@ -35,9 +36,10 @@ type Jednotka = {
   pocet_pokoju: number | null
   poznamka: string | null
   jednotky_osoby: Vazba[]
+  jednotky_cipy: Cip[]
 }
 
-type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici'
+type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici' | 'add-cip'
 
 type EditForm = {
   cislo_jednotky: string
@@ -118,6 +120,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [anOsoba, setAnOsoba] = useState('')
   const [anDatum, setAnDatum] = useState(new Date().toISOString().split('T')[0])
 
+  // Add čip form
+  const [acCislo, setAcCislo] = useState('')
+  const [acPoznamka, setAcPoznamka] = useState('')
+
   const router = useRouter()
   const supabase = createClient()
 
@@ -152,9 +158,9 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const refreshJednotky = useCallback(async () => {
     const { data } = await supabase
       .from('jednotky')
-      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni))`)
+      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), jednotky_cipy(id, cislo_cipu, poznamka)`)
       .order('cislo_jednotky')
-    if (data) setJednotky(data as Jednotka[])
+    if (data) setJednotky(data as unknown as Jednotka[])
   }, [])
 
   function openModal(id: string) {
@@ -205,6 +211,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   function openAddBydlici() {
     setAnOsoba(''); setAnDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-bydlici')
+  }
+
+  function openAddCip() {
+    setAcCislo(''); setAcPoznamka('')
+    setChyba(''); setView('add-cip')
   }
 
   // ── Uložit úpravu jednotky ──
@@ -270,6 +281,29 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     router.refresh()
     setView('detail')
     setUkladani(false)
+  }
+
+  // ── Přidat čip ──
+  async function handleAddCip(e: React.FormEvent) {
+    e.preventDefault()
+    if (!vybranaId || !acCislo) return
+    setUkladani(true); setChyba('')
+    const { error } = await supabase.from('jednotky_cipy').insert({
+      jednotka_id: vybranaId, cislo_cipu: acCislo, poznamka: acPoznamka || null,
+    })
+    if (error) { setChyba(error.message); setUkladani(false); return }
+    await refreshJednotky()
+    router.refresh()
+    setView('detail')
+    setUkladani(false)
+  }
+
+  // ── Smazat čip ──
+  async function handleDeleteCip(cipId: string) {
+    const { error } = await supabase.from('jednotky_cipy').delete().eq('id', cipId)
+    if (error) { setChyba(error.message); return }
+    await refreshJednotky()
+    router.refresh()
   }
 
   // ── Ukončit vazbu ──
@@ -601,6 +635,31 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                     )}
                   </div>
 
+                  {/* Vchodové čipy */}
+                  <div className="px-6 py-4 border-b border-zinc-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Vchodové čipy</p>
+                      <button onClick={openAddCip} className="text-xs text-violet-600 hover:text-violet-800 font-medium">+ Přidat</button>
+                    </div>
+                    {vybrana.jednotky_cipy?.length === 0 ? (
+                      <p className="text-sm text-zinc-400 italic">Žádné čipy nejsou registrovány</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {vybrana.jednotky_cipy?.map(c => (
+                          <div key={c.id} className="bg-zinc-50 rounded-xl px-3 py-2.5 ring-1 ring-zinc-100 flex items-center justify-between">
+                            <div className="min-w-0">
+                              <span className="text-sm font-mono font-bold text-zinc-900">{c.cislo_cipu}</span>
+                              {c.poznamka && <p className="text-[10px] text-zinc-400 truncate">{c.poznamka}</p>}
+                            </div>
+                            <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-400 hover:text-red-500 transition-colors ml-2 p-1">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                   </div>
                 </div>
               )}
@@ -787,6 +846,31 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
                   </div>
                 </div>
+                </div>
+              )}
+
+              {/* ── ADD ČIP ── */}
+              {view === 'add-cip' && (
+                <div className="flex-1 overflow-y-auto">
+                <form onSubmit={handleAddCip} className="px-6 py-5 space-y-4">
+                  <div>
+                    <label className={LABEL}>Číslo čipu *</label>
+                    <input value={acCislo} onChange={e => setAcCislo(e.target.value)} required placeholder="např. 042" className={INPUT} />
+                  </div>
+                  <div>
+                    <label className={LABEL}>Poznámka</label>
+                    <input value={acPoznamka} onChange={e => setAcPoznamka(e.target.value)} placeholder="např. předáno 10.4." className={INPUT} />
+                  </div>
+                  {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={ukladani || !acCislo}
+                      className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
+                      {ukladani ? 'Ukládám...' : 'Přidat čip'}
+                    </button>
+                    <button type="button" onClick={() => setView('detail')}
+                      className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
+                  </div>
+                </form>
                 </div>
               )}
 
