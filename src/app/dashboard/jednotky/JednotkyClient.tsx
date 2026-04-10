@@ -384,9 +384,12 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ backdropFilter: 'blur(4px)', backgroundColor: 'rgba(0,0,0,0.3)' }}
-          onClick={e => { if (e.target === e.currentTarget) closeModal() }}
+          onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
         >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+            onMouseDown={e => e.stopPropagation()}
+          >
             {/* Modal hlavička */}
             <div className="bg-zinc-950 px-6 py-4 flex items-start justify-between flex-shrink-0">
               <div>
