@@ -24,6 +24,7 @@ type Vazba = {
 type Jednotka = {
   id: string
   cislo_jednotky: string
+  vchod: string | null
   ulice_vchodu: string | null
   patro: number | null
   uzitna_plocha: number | null
@@ -39,6 +40,7 @@ type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydl
 
 type EditForm = {
   cislo_jednotky: string
+  vchod: string
   ulice_vchodu: string
   patro: string
   uzitna_plocha: string
@@ -95,7 +97,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
   const [chyba, setChyba] = useState('')
 
   const [editForm, setEditForm] = useState<EditForm>({
-    cislo_jednotky: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
+    cislo_jednotky: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
     vytapena_plocha: '', podil_citatel: '', podil_jmenovatel: '10000',
     pocet_pokoju: '', poznamka: '',
   })
@@ -163,6 +165,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
     if (!vybrana) return
     setEditForm({
       cislo_jednotky: vybrana.cislo_jednotky,
+      vchod: vybrana.vchod ?? '',
       ulice_vchodu: vybrana.ulice_vchodu ?? '',
       patro: vybrana.patro?.toString() ?? '',
       uzitna_plocha: vybrana.uzitna_plocha?.toString() ?? '',
@@ -200,6 +203,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
     setUkladani(true); setChyba('')
     const { error } = await supabase.from('jednotky').update({
       cislo_jednotky: editForm.cislo_jednotky,
+      vchod: editForm.vchod || null,
       ulice_vchodu: editForm.ulice_vchodu || null,
       patro: editForm.patro ? parseInt(editForm.patro) : null,
       uzitna_plocha: editForm.uzitna_plocha ? parseFloat(editForm.uzitna_plocha) : null,
@@ -330,6 +334,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
       <PageTable>
         <PageThead>
           <PageTh>Číslo</PageTh>
+          <PageTh>Vchod</PageTh>
           <PageTh>Patro</PageTh>
           <PageTh>Plocha</PageTh>
           <PageTh>Podíl</PageTh>
@@ -348,6 +353,7 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
             return (
               <PageTr key={j.id} onClick={() => openModal(j.id)}>
                 <PageTd><span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span></PageTd>
+                <PageTd>{j.vchod ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-100 text-violet-700 text-xs font-bold">{j.vchod}</span> : <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd>{j.patro ?? <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd className="tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd className="tabular-nums text-xs text-zinc-500">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : <span className="text-zinc-300">—</span>}</PageTd>
@@ -548,10 +554,17 @@ export default function JednotkyClient({ jednotky: initial }: { jednotky: Jednot
               {/* ── EDIT ── */}
               {view === 'edit' && (
                 <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <label className={LABEL}>Číslo jednotky *</label>
                       <input value={editForm.cislo_jednotky} onChange={e => setEditForm(p => ({ ...p, cislo_jednotky: e.target.value }))} required className={INPUT} />
+                    </div>
+                    <div>
+                      <label className={LABEL}>Vchod</label>
+                      <select value={editForm.vchod} onChange={e => setEditForm(p => ({ ...p, vchod: e.target.value }))} className={INPUT}>
+                        <option value="">—</option>
+                        {['A','B','C','D','E'].map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
                     </div>
                     <div>
                       <label className={LABEL}>Patro</label>
