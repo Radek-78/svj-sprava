@@ -400,13 +400,13 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
                 <div className="flex flex-1 overflow-hidden">
 
                   {/* Levý panel – kontakty + akce */}
-                  <div className="w-56 flex-shrink-0 border-r border-zinc-100 flex flex-col overflow-y-auto">
+                  <div className="w-64 flex-shrink-0 border-r border-zinc-100 flex flex-col overflow-y-auto">
                     <div className="p-5 flex-1 space-y-1">
                       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
 
                       {vybrana.email && (
                         <ContactRow icon="email" label="E-mail">
-                          <a href={`mailto:${vybrana.email}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors break-all">
+                          <a href={`mailto:${vybrana.email}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors break-words">
                             {vybrana.email}
                           </a>
                         </ContactRow>

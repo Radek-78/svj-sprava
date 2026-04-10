@@ -454,7 +454,6 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                           { l: 'Patro', v: vybrana.patro != null ? String(vybrana.patro) : '—' },
                           { l: 'Užitná plocha', v: vybrana.uzitna_plocha ? `${vybrana.uzitna_plocha} m²` : '—' },
                           { l: 'Vlastnický podíl', v: vybrana.podil_citatel ? `${vybrana.podil_citatel}/${vybrana.podil_jmenovatel}` : '—' },
-                          { l: 'Počet pokojů', v: vybrana.pocet_pokoju != null ? String(vybrana.pocet_pokoju) : '—' },
                           { l: 'Variabilní symbol', v: vybrana.var_symbol ?? '—' },
                         ].map(({ l, v }) => (
                           <div key={l} className="flex items-baseline justify-between py-2.5 border-b border-zinc-50 last:border-0">
@@ -655,12 +654,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       <input type="number" value={editForm.podil_jmenovatel} onChange={e => setEditForm(p => ({ ...p, podil_jmenovatel: e.target.value }))} className={INPUT} placeholder="10000" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={LABEL}>Počet pokojů</label>
-                      <input type="number" value={editForm.pocet_pokoju} onChange={e => setEditForm(p => ({ ...p, pocet_pokoju: e.target.value }))} className={INPUT} />
-                    </div>
-                  </div>
+
                   <div>
                     <label className={LABEL}>Poznámka</label>
                     <textarea value={editForm.poznamka} onChange={e => setEditForm(p => ({ ...p, poznamka: e.target.value }))} rows={3} className={INPUT + ' resize-none'} />
