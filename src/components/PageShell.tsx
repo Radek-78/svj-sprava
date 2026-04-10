@@ -12,7 +12,8 @@ type StatPill = {
 type PageShellProps = {
   title: string
   stats: StatPill[]
-  actions?: React.ReactNode
+  actions?: React.ReactNode   // pravá část hlavičky (tlačítko Přidat apod.)
+  toolbar?: React.ReactNode   // volitelný řádek pod hlavičkou (vyhledávání, filtry)
   children: React.ReactNode
 }
 
@@ -34,12 +35,12 @@ const PILL_COLORS = {
 
 // ─── Komponenta ───────────────────────────────────────────────────────────────
 
-export default function PageShell({ title, stats, actions, children }: PageShellProps) {
+export default function PageShell({ title, stats, actions, toolbar, children }: PageShellProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
 
-      {/* Hlavička */}
-      <div className="bg-white border-b border-zinc-200 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
+      {/* Hlavička — identická u všech záložek */}
+      <div className="bg-white border-b border-zinc-200 px-6 h-14 flex items-center justify-between gap-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <h1 className="text-base font-semibold text-zinc-900">{title}</h1>
           <div className="flex items-center gap-2">
@@ -61,6 +62,13 @@ export default function PageShell({ title, stats, actions, children }: PageShell
           </div>
         )}
       </div>
+
+      {/* Volitelný toolbar (vyhledávání, filtry) */}
+      {toolbar && (
+        <div className="bg-white border-b border-zinc-100 px-6 h-12 flex items-center gap-3 flex-shrink-0">
+          {toolbar}
+        </div>
+      )}
 
       {/* Obsah */}
       <div className="flex-1 overflow-auto">
