@@ -206,6 +206,12 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
 
   const vybrana = osoby.find(o => o.id === vybranaId) ?? null
 
+  const navIndex = filtrovane.findIndex(o => o.id === vybranaId)
+  const canPrev = navIndex > 0
+  const canNext = navIndex < filtrovane.length - 1
+  function goPrev() { if (canPrev) openModal(filtrovane[navIndex - 1].id) }
+  function goNext() { if (canNext) openModal(filtrovane[navIndex + 1].id) }
+
   const filtrovane = osoby.filter(o => {
     if (!hledani) return true
     const q = hledani.toLowerCase()
@@ -391,10 +397,25 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                   )}
                 </div>
               </div>
-              <button onClick={closeModal}
-                className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors mt-1">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
+              <div className="flex items-center gap-2 mt-1">
+                {view === 'detail' && vybranaId && (
+                  <div className="flex items-center gap-1">
+                    <button onClick={goPrev} disabled={!canPrev}
+                      className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors disabled:opacity-25 disabled:cursor-not-allowed">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <span className="text-[11px] text-zinc-500 tabular-nums min-w-[3rem] text-center">{navIndex + 1} / {filtrovane.length}</span>
+                    <button onClick={goNext} disabled={!canNext}
+                      className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors disabled:opacity-25 disabled:cursor-not-allowed">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  </div>
+                )}
+                <button onClick={closeModal}
+                  className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-white/20 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
             </div>
 
             {/* Obsah */}
