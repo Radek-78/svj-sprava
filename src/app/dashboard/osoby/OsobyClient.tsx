@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
@@ -190,7 +190,7 @@ function OsobaForm({ editForm, setEditForm, view, closeModal, setView, ukladani,
 
 // ─── Hlavní komponenta ────────────────────────────────────────────────────────
 
-export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
+export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]; openId?: string }) {
   const [osoby, setOsoby] = useState(initial)
   const [vybranaId, setVybranaId] = useState<string | null>(null)
   const [view, setView] = useState<ModalView>('detail')
@@ -203,6 +203,13 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
 
   const router = useRouter()
   const supabase = createClient()
+
+  useEffect(() => {
+    if (openId && osoby.some(o => o.id === openId)) {
+      openModal(openId)
+      router.replace('/dashboard/osoby')
+    }
+  }, [openId])
 
   const vybrana = osoby.find(o => o.id === vybranaId) ?? null
 

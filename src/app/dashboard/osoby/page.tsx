@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import OsobyClient from './OsobyClient'
 
-export default async function OsobyPage() {
+export default async function OsobyPage({ searchParams }: { searchParams: Promise<{ open?: string }> }) {
   const supabase = await createClient()
+  const { open } = await searchParams
 
   const { data: osoby } = await supabase
     .from('osoby')
@@ -17,7 +18,7 @@ export default async function OsobyPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <OsobyClient osoby={osoby ?? []} />
+      <OsobyClient osoby={osoby ?? []} openId={open} />
     </div>
   )
 }
