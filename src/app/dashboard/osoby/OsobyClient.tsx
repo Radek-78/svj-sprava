@@ -371,7 +371,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
           onMouseDown={e => { if (e.target === e.currentTarget) closeModal() }}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
             onMouseDown={e => e.stopPropagation()}
           >
 
@@ -442,16 +442,18 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                       </ContactRow>
                       <ContactRow icon="address" label="Adresa">
                         {(vybrana.kontaktni_ulice || vybrana.kontaktni_mesto)
-                          ? <p className="text-sm text-zinc-800 leading-snug">{[vybrana.kontaktni_ulice, vybrana.kontaktni_mesto, vybrana.kontaktni_psc].filter(Boolean).join(', ')}</p>
+                          ? <div className="text-sm text-zinc-800 leading-snug">
+                              {vybrana.kontaktni_ulice && <p>{vybrana.kontaktni_ulice}</p>}
+                              {vybrana.kontaktni_psc && vybrana.kontaktni_mesto
+                                ? <p>{vybrana.kontaktni_psc} {vybrana.kontaktni_mesto}</p>
+                                : vybrana.kontaktni_mesto
+                                  ? <p>{vybrana.kontaktni_mesto}</p>
+                                  : vybrana.kontaktni_psc
+                                    ? <p>{vybrana.kontaktni_psc}</p>
+                                    : null}
+                            </div>
                           : <span className="text-sm text-zinc-300">—</span>}
                       </ContactRow>
-
-                      {vybrana.poznamka && (
-                        <div className="mt-4 pt-4 border-t border-zinc-50">
-                          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1.5">Poznámka</p>
-                          <p className="text-xs text-zinc-500 leading-relaxed">{vybrana.poznamka}</p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Akce */}
@@ -481,8 +483,8 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     </div>
                   </div>
 
-                  {/* Pravý panel – jednotky */}
-                  <div className="flex-1 overflow-y-auto p-5">
+                  {/* Prostřední panel – jednotky */}
+                  <div className="flex-1 overflow-y-auto p-5 border-r border-zinc-100">
                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Jednotky</p>
                     {vybrana.jednotky_osoby.length === 0 ? (
                       <p className="text-sm text-zinc-400 italic">Žádné přiřazení.</p>
@@ -522,6 +524,14 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                           ))}
                       </div>
                     )}
+                  </div>
+
+                  {/* Pravý panel – poznámka */}
+                  <div className="w-52 flex-shrink-0 overflow-y-auto p-5">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Poznámka</p>
+                    {vybrana.poznamka
+                      ? <p className="text-xs text-zinc-500 leading-relaxed">{vybrana.poznamka}</p>
+                      : <p className="text-sm text-zinc-300">—</p>}
                   </div>
                 </div>
               )}
