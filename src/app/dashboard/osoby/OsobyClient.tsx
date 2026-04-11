@@ -206,12 +206,6 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
 
   const vybrana = osoby.find(o => o.id === vybranaId) ?? null
 
-  const navIndex = filtrovane.findIndex(o => o.id === vybranaId)
-  const canPrev = navIndex > 0
-  const canNext = navIndex < filtrovane.length - 1
-  function goPrev() { if (canPrev) openModal(filtrovane[navIndex - 1].id) }
-  function goNext() { if (canNext) openModal(filtrovane[navIndex + 1].id) }
-
   const filtrovane = osoby.filter(o => {
     if (!hledani) return true
     const q = hledani.toLowerCase()
@@ -228,6 +222,12 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
       jednotkyCisla.includes(q)
     )
   })
+
+  const navIndex = filtrovane.findIndex(o => o.id === vybranaId)
+  const canPrev = navIndex > 0
+  const canNext = navIndex < filtrovane.length - 1
+  function goPrev() { if (canPrev) openModal(filtrovane[navIndex - 1].id) }
+  function goNext() { if (canNext) openModal(filtrovane[navIndex + 1].id) }
 
   const celkem = osoby.length
   const vlastnici = new Set(osoby.filter(o => o.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)).map(o => o.id)).size
