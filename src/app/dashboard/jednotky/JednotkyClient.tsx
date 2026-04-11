@@ -8,6 +8,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null }
+type OsobaMinimal = { id: string; jmeno: string | null; prijmeni: string }
 type Cip = { 
   id: string; 
   cislo_cipu: string; 
@@ -132,7 +133,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [jednotky, setJednotky] = useState(initial)
   const [vybranaId, setVybranaId] = useState<string | null>(null)
   const [view, setView] = useState<ModalView>('detail')
-  const [vsechnyOsoby, setVsechnyOsoby] = useState<Osoba[]>([])
+  const [vsechnyOsoby, setVsechnyOsoby] = useState<OsobaMinimal[]>([])
   const [mazani, setMazani] = useState(false)
   const [potvrzeni, setPotvrzeni] = useState(false)
   const [ukladani, setUkladani] = useState(false)
