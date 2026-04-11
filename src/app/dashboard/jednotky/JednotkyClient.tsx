@@ -115,12 +115,12 @@ function kontaktWarning(vlastnici: Vazba[]): KontaktLevel {
 function KontaktIcon({ level }: { level: KontaktLevel }) {
   if (!level) return null
   const cfg = {
-    red:    { color: 'text-red-500',    bg: 'bg-red-50',    title: 'Vlastník nemá žádný telefon ani email' },
-    orange: { color: 'text-orange-500', bg: 'bg-orange-50', title: 'Vlastník nemá telefon (má email)' },
-    yellow: { color: 'text-yellow-500', bg: 'bg-yellow-50', title: 'Vlastník nemá email (má telefon)' },
+    red:    { bg: 'bg-red-500',    title: 'Vlastník nemá žádný telefon ani email' },
+    orange: { bg: 'bg-orange-400', title: 'Vlastník nemá telefon (má email)' },
+    yellow: { bg: 'bg-yellow-400', title: 'Vlastník nemá email (má telefon)' },
   }[level]
   return (
-    <span title={cfg.title} className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${cfg.bg} ${cfg.color} font-black text-sm select-none`}>!</span>
+    <span title={cfg.title} className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${cfg.bg} text-white font-black text-sm select-none`}>!</span>
   )
 }
 
