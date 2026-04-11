@@ -67,7 +67,7 @@ type EditForm = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatJmeno(o: Osoba) {
+function formatJmeno(o: OsobaMinimal) {
   return [o.prijmeni, o.jmeno].filter(Boolean).join(' ')
 }
 
