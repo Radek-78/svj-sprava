@@ -13,7 +13,7 @@ type VyborClen = {
   jmeno_externi: string | null
   email: string | null
   telefon: string | null
-  osoby?: { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null } | null
+  osoby?: { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null } | null
 }
 
 type AuthUser = {
@@ -66,7 +66,7 @@ function getClenEmail(clen: VyborClen): string | null {
 }
 
 function getClenTelefon(clen: VyborClen): string | null {
-  if (clen.osoby) return clen.osoby.mobil ?? clen.osoby.telefon ?? null
+  if (clen.osoby) return clen.osoby.telefon ?? null
   return clen.telefon
 }
 
@@ -113,7 +113,7 @@ export default function PrehledClient({
 }) {
   const [vybor, setVybor] = useState(initialVybor)
   const [nastaveni, setNastaveni] = useState(initialNastaveni)
-  const [vsechnyOsoby, setVsechnyOsoby] = useState<{ id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null }[]>([])
+  const [vsechnyOsoby, setVsechnyOsoby] = useState<{ id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null }[]>([])
 
   // Auth uživatelé
   const [users, setUsers] = useState<AuthUser[]>([])
@@ -166,14 +166,14 @@ export default function PrehledClient({
   // Načíst osoby pro formulář výboru
   useEffect(() => {
     if (vyborOpen) {
-      supabase.from('osoby').select('id, jmeno, prijmeni, email, telefon, mobil').order('prijmeni')
+      supabase.from('osoby').select('id, jmeno, prijmeni, email, telefon').order('prijmeni')
         .then(({ data }) => setVsechnyOsoby(data ?? []))
     }
   }, [vyborOpen])
 
   // Refresh výboru ze Supabase
   async function refreshVybor() {
-    const { data } = await supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni, email, telefon, mobil)').order('poradi')
+    const { data } = await supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni, email, telefon)').order('poradi')
     setVybor(data ?? [])
   }
 

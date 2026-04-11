@@ -28,7 +28,6 @@ type Osoba = {
   titul: string | null
   email: string | null
   telefon: string | null
-  mobil: string | null
   kontaktni_ulice: string | null
   kontaktni_mesto: string | null
   kontaktni_psc: string | null
@@ -44,7 +43,6 @@ type EditForm = {
   titul: string
   email: string
   telefon: string
-  mobil: string
   kontaktni_ulice: string
   kontaktni_mesto: string
   kontaktni_psc: string
@@ -90,7 +88,7 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 
 const EMPTY_FORM: EditForm = {
   jmeno: '', prijmeni: '', titul: '', email: '', telefon: '',
-  mobil: '', kontaktni_ulice: '', kontaktni_mesto: '', kontaktni_psc: '', poznamka: '',
+  kontaktni_ulice: '', kontaktni_mesto: '', kontaktni_psc: '', poznamka: '',
 }
 
 // ─── Formulář osoby — mimo komponentu, aby React neztrácet focus ─────────────
@@ -134,11 +132,6 @@ function OsobaForm({ editForm, setEditForm, view, closeModal, setView, ukladani,
           <label className={LABEL}>Telefon</label>
           <input className={INPUT} value={editForm.telefon} onChange={e => setEditForm(f => ({ ...f, telefon: e.target.value }))} placeholder="+420 xxx xxx xxx" />
         </div>
-      </div>
-
-      <div>
-        <label className={LABEL}>Mobil</label>
-        <input className={INPUT} value={editForm.mobil} onChange={e => setEditForm(f => ({ ...f, mobil: e.target.value }))} placeholder="+420 xxx xxx xxx" />
       </div>
 
       <div className="border-t border-zinc-100 pt-4">
@@ -223,7 +216,6 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
       (o.titul ?? '').toLowerCase().includes(q) ||
       (o.email ?? '').toLowerCase().includes(q) ||
       (o.telefon ?? '').toLowerCase().includes(q) ||
-      (o.mobil ?? '').toLowerCase().includes(q) ||
       (o.kontaktni_ulice ?? '').toLowerCase().includes(q) ||
       (o.kontaktni_mesto ?? '').toLowerCase().includes(q) ||
       (o.kontaktni_psc ?? '').includes(q) ||
@@ -255,7 +247,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
     if (!vybrana) return
     setEditForm({
       jmeno: vybrana.jmeno ?? '', prijmeni: vybrana.prijmeni, titul: vybrana.titul ?? '',
-      email: vybrana.email ?? '', telefon: vybrana.telefon ?? '', mobil: vybrana.mobil ?? '',
+      email: vybrana.email ?? '', telefon: vybrana.telefon ?? '',
       kontaktni_ulice: vybrana.kontaktni_ulice ?? '', kontaktni_mesto: vybrana.kontaktni_mesto ?? '',
       kontaktni_psc: vybrana.kontaktni_psc ?? '', poznamka: vybrana.poznamka ?? '',
     })
@@ -272,7 +264,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
     setUkladani(true); setChyba('')
     const { error } = await supabase.from('osoby').update({
       jmeno: editForm.jmeno || null, prijmeni: editForm.prijmeni, titul: editForm.titul || null,
-      email: editForm.email || null, telefon: editForm.telefon || null, mobil: editForm.mobil || null,
+      email: editForm.email || null, telefon: editForm.telefon || null,
       kontaktni_ulice: editForm.kontaktni_ulice || null, kontaktni_mesto: editForm.kontaktni_mesto || null,
       kontaktni_psc: editForm.kontaktni_psc || null, poznamka: editForm.poznamka || null,
     }).eq('id', vybranaId)
@@ -286,7 +278,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
     setUkladani(true); setChyba('')
     const { data, error } = await supabase.from('osoby').insert({
       jmeno: editForm.jmeno || null, prijmeni: editForm.prijmeni, titul: editForm.titul || null,
-      email: editForm.email || null, telefon: editForm.telefon || null, mobil: editForm.mobil || null,
+      email: editForm.email || null, telefon: editForm.telefon || null,
       kontaktni_ulice: editForm.kontaktni_ulice || null, kontaktni_mesto: editForm.kontaktni_mesto || null,
       kontaktni_psc: editForm.kontaktni_psc || null, poznamka: editForm.poznamka || null,
     }).select().single()
@@ -324,7 +316,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
           <PageThead>
             <PageTh>Jméno</PageTh>
             <PageTh>E-mail</PageTh>
-            <PageTh>Telefon / Mobil</PageTh>
+            <PageTh>Telefon</PageTh>
             <PageTh>Adresa</PageTh>
             <PageTh>Jednotky</PageTh>
           </PageThead>
@@ -335,7 +327,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
             {filtrovane.map(osoba => {
               const aktivniVazby = osoba.jednotky_osoby.filter(v => v.je_aktivni)
               const adresa = [osoba.kontaktni_ulice, osoba.kontaktni_mesto].filter(Boolean).join(', ')
-              const kontakt = [osoba.telefon, osoba.mobil].filter(Boolean).join(' / ')
+              const kontakt = osoba.telefon ?? ''
               return (
                 <PageTr key={osoba.id} onClick={() => openModal(osoba.id)}>
                   <PageTd>
@@ -424,13 +416,6 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                           </a>
                         </ContactRow>
                       )}
-                      {vybrana.mobil && (
-                        <ContactRow icon="phone" label="Mobil">
-                          <a href={`tel:${vybrana.mobil}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">
-                            {vybrana.mobil}
-                          </a>
-                        </ContactRow>
-                      )}
                       {vybrana.telefon && (
                         <ContactRow icon="phone" label="Telefon">
                           <a href={`tel:${vybrana.telefon}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">
@@ -445,7 +430,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                           </p>
                         </ContactRow>
                       )}
-                      {!vybrana.email && !vybrana.mobil && !vybrana.telefon && !vybrana.kontaktni_ulice && (
+                      {!vybrana.email && !vybrana.telefon && !vybrana.kontaktni_ulice && (
                         <p className="text-sm text-zinc-400 italic">Žádné kontaktní údaje.</p>
                       )}
 

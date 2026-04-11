@@ -7,7 +7,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
-type Osoba = { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null }
+type Osoba = { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null }
 type Cip = { 
   id: string; 
   cislo_cipu: string; 
@@ -100,7 +100,7 @@ function kontaktWarning(vlastnici: Vazba[]): KontaktLevel {
   let worst: KontaktLevel = null
   const severity: Record<NonNullable<KontaktLevel>, number> = { red: 3, orange: 2, yellow: 1 }
   for (const v of vlastnici) {
-    const hasPhone = !!(v.osoby.telefon || v.osoby.mobil)
+    const hasPhone = !!v.osoby.telefon
     const hasEmail = !!v.osoby.email
     let level: KontaktLevel = null
     if (!hasPhone && !hasEmail) level = 'red'

@@ -12,7 +12,7 @@ export default async function PrehledPage() {
   ] = await Promise.all([
     supabase.from('jednotky').select('id, jednotky_osoby(role, je_aktivni)'),
     supabase.from('osoby').select('*', { count: 'exact', head: true }),
-    supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni, email, telefon, mobil)').order('poradi'),
+    supabase.from('vybor').select('*, osoby(id, jmeno, prijmeni, email, telefon)').order('poradi'),
     supabase.from('svj_nastaveni').select('klic, hodnota'),
   ])
 
