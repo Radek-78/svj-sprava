@@ -430,30 +430,21 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     <div className="p-5 flex-1 space-y-1">
                       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
 
-                      {vybrana.email && (
-                        <ContactRow icon="email" label="E-mail">
-                          <a href={`mailto:${vybrana.email}`} className="text-xs text-zinc-800 hover:text-violet-600 transition-colors break-all leading-relaxed">
-                            {vybrana.email}
-                          </a>
-                        </ContactRow>
-                      )}
-                      {vybrana.telefon && (
-                        <ContactRow icon="phone" label="Telefon">
-                          <a href={`tel:${vybrana.telefon}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">
-                            {vybrana.telefon}
-                          </a>
-                        </ContactRow>
-                      )}
-                      {(vybrana.kontaktni_ulice || vybrana.kontaktni_mesto) && (
-                        <ContactRow icon="address" label="Adresa">
-                          <p className="text-sm text-zinc-800 leading-snug">
-                            {[vybrana.kontaktni_ulice, vybrana.kontaktni_mesto, vybrana.kontaktni_psc].filter(Boolean).join(', ')}
-                          </p>
-                        </ContactRow>
-                      )}
-                      {!vybrana.email && !vybrana.telefon && !vybrana.kontaktni_ulice && (
-                        <p className="text-sm text-zinc-400 italic">Žádné kontaktní údaje.</p>
-                      )}
+                      <ContactRow icon="email" label="E-mail">
+                        {vybrana.email
+                          ? <a href={`mailto:${vybrana.email}`} className="text-xs text-zinc-800 hover:text-violet-600 transition-colors break-all leading-relaxed">{vybrana.email}</a>
+                          : <span className="text-sm text-zinc-300">—</span>}
+                      </ContactRow>
+                      <ContactRow icon="phone" label="Telefon">
+                        {vybrana.telefon
+                          ? <a href={`tel:${vybrana.telefon}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">{vybrana.telefon}</a>
+                          : <span className="text-sm text-zinc-300">—</span>}
+                      </ContactRow>
+                      <ContactRow icon="address" label="Adresa">
+                        {(vybrana.kontaktni_ulice || vybrana.kontaktni_mesto)
+                          ? <p className="text-sm text-zinc-800 leading-snug">{[vybrana.kontaktni_ulice, vybrana.kontaktni_mesto, vybrana.kontaktni_psc].filter(Boolean).join(', ')}</p>
+                          : <span className="text-sm text-zinc-300">—</span>}
+                      </ContactRow>
 
                       {vybrana.poznamka && (
                         <div className="mt-4 pt-4 border-t border-zinc-50">
