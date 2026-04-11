@@ -656,11 +656,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                                 </div>
                                 <div className="space-y-1.5">
                                   {aktivniVlastnici.map(v => (
-                                    <div key={v.id} className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-zinc-200/60 shadow-sm">
-                                      <button onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="text-xs font-bold text-zinc-900 hover:text-violet-600 transition-colors text-left">{formatJmeno(v.osoby)}</button>
+                                    <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-zinc-200/60 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors">
+                                      <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
                                       <div className="flex items-center gap-1">
-                                        <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold transition-colors">Ukončit</button>
-                                        <button onClick={() => handleSmazatVazbu(v.id)} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold transition-colors">Smazat</button>
+                                        <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold transition-colors">Ukončit</button>
+                                        <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold transition-colors">Smazat</button>
                                       </div>
                                     </div>
                                   ))}
@@ -669,20 +669,20 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                             )
                           }
                           return aktivniVlastnici.map(v => (
-                            <div key={v.id} className="bg-white rounded-xl p-3 border border-zinc-200 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between group">
+                            <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="bg-white rounded-xl p-3 border border-zinc-200 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors flex items-center justify-between group">
                               <div className="flex items-center gap-3">
                                 {typVlastnictviBadge(v.typ_vlastnictvi)}
                                 <div className="flex flex-col">
                                   <div className="flex items-center gap-2">
-                                    <button onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="text-xs font-bold text-zinc-900 hover:text-violet-600 transition-colors text-left">{formatJmeno(v.osoby)}</button>
+                                    <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
                                     {v.podil_citatel && <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-md tabular-nums">{v.podil_citatel}/{v.podil_jmenovatel}</span>}
                                   </div>
                                   {v.datum_od && <p className="text-[9px] font-medium text-zinc-400">od {v.datum_od}</p>}
                                 </div>
                               </div>
                               <div className="flex items-center gap-1">
-                                <button onClick={() => handleUkoncitVazbu(v.id)} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold">Ukončit</button>
-                                <button onClick={() => handleSmazatVazbu(v.id)} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
+                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold">Ukončit</button>
+                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
                               </div>
                             </div>
                           ))
@@ -707,14 +707,14 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       ) : (
                         <div className="space-y-2">
                           {aktivniNajemnik.map(n => (
-                            <div key={n.id} className="bg-amber-50/20 rounded-xl p-3 border border-amber-100/50 flex items-center justify-between group">
+                            <div key={n.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${n.osoby.id}`) }} className="bg-amber-50/20 rounded-xl p-3 border border-amber-100/50 flex items-center justify-between group cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors">
                               <div className="flex flex-col">
-                                <button onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${n.osoby.id}`) }} className="text-xs font-bold text-zinc-900 hover:text-violet-600 transition-colors text-left">{formatJmeno(n.osoby)}</button>
+                                <span className="text-xs font-bold text-zinc-900">{formatJmeno(n.osoby)}</span>
                                 {n.datum_od && <p className="text-[9px] font-bold text-amber-600/60">od {n.datum_od}</p>}
                               </div>
                               <div className="flex items-center gap-1">
-                                <button onClick={() => handleUkoncitVazbu(n.id)} className="text-[9px] text-amber-600 hover:bg-amber-100 px-2 py-1 rounded-lg font-bold">Ukončit</button>
-                                <button onClick={() => handleSmazatVazbu(n.id)} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
+                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(n.id) }} className="text-[9px] text-amber-600 hover:bg-amber-100 px-2 py-1 rounded-lg font-bold">Ukončit</button>
+                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(n.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
                               </div>
                             </div>
                           ))}
@@ -738,11 +738,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       ) : (
                         <div className="bg-blue-50/5 border border-blue-100/30 rounded-xl divide-y divide-blue-50/50">
                           {aktivniBydlici.map(b => (
-                            <div key={b.id} className="px-3 py-2 flex items-center justify-between group hover:bg-blue-50/30 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                              <button onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${b.osoby.id}`) }} className="text-xs font-medium text-zinc-900 hover:text-violet-600 transition-colors text-left">{formatJmeno(b.osoby)}</button>
+                            <div key={b.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${b.osoby.id}`) }} className="px-3 py-2 flex items-center justify-between group cursor-pointer hover:bg-violet-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                              <span className="text-xs font-medium text-zinc-900">{formatJmeno(b.osoby)}</span>
                               <div className="flex items-center gap-1">
-                                <button onClick={() => handleUkoncitVazbu(b.id)} className="text-[9px] text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded-md font-bold">Odhlásit</button>
-                                <button onClick={() => handleSmazatVazbu(b.id)} className="text-[9px] text-red-300 hover:bg-red-50 px-2 py-0.5 rounded-md font-bold">Smazat</button>
+                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(b.id) }} className="text-[9px] text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded-md font-bold">Odhlásit</button>
+                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(b.id) }} className="text-[9px] text-red-300 hover:bg-red-50 px-2 py-0.5 rounded-md font-bold">Smazat</button>
                               </div>
                             </div>
                           ))}
