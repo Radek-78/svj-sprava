@@ -7,7 +7,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
-type Osoba = { id: string; jmeno: string | null; prijmeni: string }
+type Osoba = { id: string; jmeno: string | null; prijmeni: string; email: string | null; telefon: string | null; mobil: string | null }
 type Cip = { 
   id: string; 
   cislo_cipu: string; 
@@ -91,6 +91,35 @@ function typVlastnictviBadge(typ: string | null) {
     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 ${colors[typ] ?? 'bg-zinc-100 text-zinc-600'}`}>
       {typ.toUpperCase()}
     </span>
+  )
+}
+
+type KontaktLevel = 'red' | 'orange' | 'yellow' | null
+
+function kontaktWarning(vlastnici: Vazba[]): KontaktLevel {
+  let worst: KontaktLevel = null
+  const severity: Record<NonNullable<KontaktLevel>, number> = { red: 3, orange: 2, yellow: 1 }
+  for (const v of vlastnici) {
+    const hasPhone = !!(v.osoby.telefon || v.osoby.mobil)
+    const hasEmail = !!v.osoby.email
+    let level: KontaktLevel = null
+    if (!hasPhone && !hasEmail) level = 'red'
+    else if (!hasPhone) level = 'orange'
+    else if (!hasEmail) level = 'yellow'
+    if (level && (!worst || severity[level] > severity[worst])) worst = level
+  }
+  return worst
+}
+
+function KontaktIcon({ level }: { level: KontaktLevel }) {
+  if (!level) return null
+  const cfg = {
+    red:    { color: 'text-red-500',    bg: 'bg-red-50',    title: 'Vlastník nemá žádný telefon ani email' },
+    orange: { color: 'text-orange-500', bg: 'bg-orange-50', title: 'Vlastník nemá telefon (má email)' },
+    yellow: { color: 'text-yellow-500', bg: 'bg-yellow-50', title: 'Vlastník nemá email (má telefon)' },
+  }[level]
+  return (
+    <span title={cfg.title} className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${cfg.bg} ${cfg.color} font-black text-sm select-none`}>!</span>
   )
 }
 
@@ -461,6 +490,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
           <PageTh>Nájemník</PageTh>
           <PageTh center>Hlášeni</PageTh>
           <PageTh>Stav</PageTh>
+          <PageTh center></PageTh>
         </PageThead>
         <PageTbody>
           {filtrovane.length === 0 && <PageEmpty text={hledani ? 'Žádná jednotka neodpovídá hledání.' : 'Zatím žádné jednotky.'} />}
@@ -469,6 +499,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
             const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
             const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
             const maNajemnika = !!naj
+            const aktivniVlastnici = j.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni)
+            const warning = kontaktWarning(aktivniVlastnici)
             return (
               <PageTr key={j.id} onClick={() => openModal(j.id)}>
                 <PageTd><span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{j.cislo_jednotky}</span></PageTd>
@@ -501,6 +533,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                             Volné
                           </span>}
                 </PageTd>
+                <PageTd center><KontaktIcon level={warning} /></PageTd>
               </PageTr>
             )
           })}
