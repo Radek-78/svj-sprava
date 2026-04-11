@@ -11,7 +11,7 @@ export default async function OsobyPage({ searchParams }: { searchParams: Promis
       *,
       jednotky_osoby(
         id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni,
-        jednotky(id, cislo_jednotky, ulice_vchodu)
+        jednotky(id, cislo_jednotky, ulice_vchodu, vchod)
       )
     `)
     .order('prijmeni')

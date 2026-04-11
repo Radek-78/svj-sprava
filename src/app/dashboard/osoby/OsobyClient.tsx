@@ -7,7 +7,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
-type Jednotka = { id: string; cislo_jednotky: string; ulice_vchodu: string | null }
+type Jednotka = { id: string; cislo_jednotky: string; ulice_vchodu: string | null; vchod: string | null }
 
 type Vazba = {
   id: string
@@ -236,7 +236,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
   const refreshOsoby = useCallback(async () => {
     const { data } = await supabase
       .from('osoby')
-      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, jednotky(id, cislo_jednotky, ulice_vchodu))`)
+      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, jednotky(id, cislo_jednotky, ulice_vchodu, vchod))`)
       .order('prijmeni')
     if (data) setOsoby(data as Osoba[])
   }, [])
@@ -502,7 +502,11 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                                 <div>
                                   <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-semibold text-sm text-zinc-900">Jednotka {v.jednotky.cislo_jednotky}</span>
-                                    {v.jednotky.ulice_vchodu && <span className="text-xs text-zinc-400">{v.jednotky.ulice_vchodu}</span>}
+                                    {v.jednotky.ulice_vchodu && (
+                                      <span className="text-xs text-zinc-400">
+                                        {v.jednotky.ulice_vchodu}{v.jednotky.vchod ? `/${v.jednotky.vchod}` : ''}
+                                      </span>
+                                    )}
                                   </div>
                                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                     {roleBadge(v.role)}
