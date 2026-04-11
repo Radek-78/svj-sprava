@@ -209,12 +209,18 @@ export default function OsobyClient({ osoby: initial }: { osoby: Osoba[] }) {
   const filtrovane = osoby.filter(o => {
     if (!hledani) return true
     const q = hledani.toLowerCase()
+    const jednotkyCisla = o.jednotky_osoby.map(v => v.jednotky.cislo_jednotky).join(' ')
     return (
       o.prijmeni.toLowerCase().includes(q) ||
       (o.jmeno ?? '').toLowerCase().includes(q) ||
+      (o.titul ?? '').toLowerCase().includes(q) ||
       (o.email ?? '').toLowerCase().includes(q) ||
       (o.telefon ?? '').toLowerCase().includes(q) ||
-      (o.mobil ?? '').toLowerCase().includes(q)
+      (o.mobil ?? '').toLowerCase().includes(q) ||
+      (o.kontaktni_ulice ?? '').toLowerCase().includes(q) ||
+      (o.kontaktni_mesto ?? '').toLowerCase().includes(q) ||
+      (o.kontaktni_psc ?? '').includes(q) ||
+      jednotkyCisla.includes(q)
     )
   })
 

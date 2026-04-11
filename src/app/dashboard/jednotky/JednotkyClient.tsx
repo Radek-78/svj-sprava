@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr } from '@/components/PageShell'
+import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -108,6 +108,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [potvrzeni, setPotvrzeni] = useState(false)
   const [ukladani, setUkladani] = useState(false)
   const [chyba, setChyba] = useState('')
+
+  const [hledani, setHledani] = useState('')
 
   const [editForm, setEditForm] = useState<EditForm>({
     cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
@@ -371,6 +373,27 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     router.refresh()
   }
 
+  // ─── Filtrování ──────────────────────────────────────────────────────────────
+
+  const filtrovane = jednotky.filter(j => {
+    if (!hledani) return true
+    const q = hledani.toLowerCase()
+    const vlastnici = j.jednotky_osoby
+      .filter(v => v.role === 'vlastnik' && v.je_aktivni)
+      .map(v => formatJmeno(v.osoby))
+      .join(' ')
+    const najemnik = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
+    return (
+      j.cislo_jednotky.toLowerCase().includes(q) ||
+      (j.vchod ?? '').toLowerCase().includes(q) ||
+      (j.ulice_vchodu ?? '').toLowerCase().includes(q) ||
+      (j.patro?.toString() ?? '').includes(q) ||
+      (j.var_symbol ?? '').includes(q) ||
+      vlastnici.toLowerCase().includes(q) ||
+      (najemnik ? formatJmeno(najemnik.osoby).toLowerCase().includes(q) : false)
+    )
+  })
+
   // ─── Render tabulky ──────────────────────────────────────────────────────────
 
   function renderVlastnikCell(j: Jednotka) {
@@ -421,7 +444,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
         { label: 'volné', value: celkem - obsazeno, dot: 'zinc' },
       ]}
       actions={
-        <AddButton onClick={() => {/* TODO */}}>Přidat jednotku</AddButton>
+        <>
+          <SearchInput value={hledani} onChange={setHledani} placeholder="Hledat jednotku…" />
+          <AddButton onClick={() => {/* TODO */}}>Přidat jednotku</AddButton>
+        </>
       }
     >
       <PageTable>
@@ -437,8 +463,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
           <PageTh>Stav</PageTh>
         </PageThead>
         <PageTbody>
-          {jednotky.length === 0 && <PageEmpty text="Zatím žádné jednotky." />}
-          {jednotky.map(j => {
+          {filtrovane.length === 0 && <PageEmpty text={hledani ? 'Žádná jednotka neodpovídá hledání.' : 'Zatím žádné jednotky.'} />}
+          {filtrovane.map(j => {
             const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
             const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
             const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
