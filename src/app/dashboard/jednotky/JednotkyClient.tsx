@@ -491,7 +491,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
           <PageTh>Nájemník</PageTh>
           <PageTh center>Hlášeni</PageTh>
           <PageTh>Stav</PageTh>
-          <PageTh center></PageTh>
+          <PageTh center> </PageTh>
         </PageThead>
         <PageTbody>
           {filtrovane.length === 0 && <PageEmpty text={hledani ? 'Žádná jednotka neodpovídá hledání.' : 'Zatím žádné jednotky.'} />}
