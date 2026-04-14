@@ -156,6 +156,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   // Add nájemník / bydlící form
   const [anOsoby, setAnOsoby] = useState<string[]>([])
   const [anDatum, setAnDatum] = useState(new Date().toISOString().split('T')[0])
+  const [anPocetAnonymi, setAnPocetAnonymi] = useState(1)
+  const [anAnonymi, setAnAnonymi] = useState(false)
 
   function toggleAnOsoba(id: string) {
     setAnOsoby(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
@@ -259,6 +261,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
 
   function openAddBydlici(preselect: string[] = []) {
     setAnOsoby(preselect); setAnDatum(new Date().toISOString().split('T')[0])
+    setAnPocetAnonymi(1); setAnAnonymi(false)
     setChyba(''); setView('add-bydlici')
   }
 
@@ -332,6 +335,25 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     router.refresh()
     setView('detail')
     setUkladani(false)
+  }
+
+  // ── Přidat anonymní osoby k pobytu ──
+  async function handleAddAnonymi() {
+    if (!vybranaId || anPocetAnonymi < 1) return
+    setUkladani(true); setChyba('')
+    const existujici = aktivniBydlici.filter(b => b.osoby.prijmeni === 'Neznámá osoba').length
+    const osobyData = Array.from({ length: anPocetAnonymi }, (_, i) => ({
+      prijmeni: 'Neznámá osoba',
+      jmeno: `${existujici + i + 1}`,
+    }))
+    const { data, error } = await supabase.from('osoby').insert(osobyData).select('id')
+    if (error || !data) { setChyba(error?.message ?? 'Chyba'); setUkladani(false); return }
+    const vazby = data.map(o => ({
+      jednotka_id: vybranaId, osoba_id: o.id, role: 'bydlici', datum_od: anDatum, je_aktivni: true,
+    }))
+    const { error: e2 } = await supabase.from('jednotky_osoby').insert(vazby)
+    if (e2) { setChyba(e2.message); setUkladani(false); return }
+    await refreshJednotky(); router.refresh(); setView('detail'); setUkladani(false)
   }
 
   // ── Rychlé přidání nájemníků jako bydlících ──
@@ -1085,6 +1107,32 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                     <label className={LABEL}>{view === 'add-najemnik' ? 'Nájemník od' : 'Hlášen od'}</label>
                     <input type="date" value={anDatum} onChange={e => setAnDatum(e.target.value)} className={INPUT} />
                   </div>
+                  {/* Anonymní osoby — pouze pro bydlící */}
+                  {view === 'add-bydlici' && (
+                    <div className="border border-dashed border-zinc-200 rounded-xl p-3">
+                      <button type="button" onClick={() => setAnAnonymi(v => !v)}
+                        className="flex items-center gap-2 text-xs font-semibold text-zinc-500 hover:text-zinc-800 transition-colors w-full text-left">
+                        <svg className={`w-3.5 h-3.5 transition-transform ${anAnonymi ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        Přidat osoby bez údajů (Osoba 1, Osoba 2…)
+                      </button>
+                      {anAnonymi && (
+                        <div className="mt-3 flex items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => setAnPocetAnonymi(p => Math.max(1, p - 1))}
+                              className="w-7 h-7 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center justify-center font-bold text-lg leading-none">−</button>
+                            <span className="text-sm font-semibold text-zinc-900 w-6 text-center">{anPocetAnonymi}</span>
+                            <button type="button" onClick={() => setAnPocetAnonymi(p => Math.min(10, p + 1))}
+                              className="w-7 h-7 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center justify-center font-bold text-lg leading-none">+</button>
+                          </div>
+                          <button type="button" onClick={handleAddAnonymi} disabled={ukladani}
+                            className="flex-1 bg-zinc-800 text-white text-sm py-2 rounded-xl hover:bg-zinc-950 transition-colors font-medium disabled:opacity-40">
+                            {ukladani ? 'Ukládám…' : `Přidat ${anPocetAnonymi} ${anPocetAnonymi === 1 ? 'osobu' : anPocetAnonymi < 5 ? 'osoby' : 'osob'}`}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
                   <div className="flex gap-2">
                     <button onClick={() => handleAddVazba(view === 'add-najemnik' ? 'najemnik' : 'bydlici')}
