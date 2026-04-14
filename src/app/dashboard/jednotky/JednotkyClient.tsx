@@ -802,6 +802,21 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                           <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Hlášeni k pobytu</p>
                         </div>
                         <div className="flex items-center gap-1.5">
+                          {aktivniVlastnici.some(v => !aktivniBydlici.some(b => b.osoby.id === v.osoby.id)) && (
+                            <button onClick={async () => {
+                              if (!vybranaId) return
+                              const bydliciIds = new Set(aktivniBydlici.map(b => b.osoby.id))
+                              const kPridani = aktivniVlastnici.filter(v => !bydliciIds.has(v.osoby.id))
+                              await supabase.from('jednotky_osoby').insert(kPridani.map(v => ({
+                                jednotka_id: vybranaId, osoba_id: v.osoby.id, role: 'bydlici',
+                                datum_od: new Date().toISOString().split('T')[0], je_aktivni: true,
+                              })))
+                              await refreshJednotky(); router.refresh()
+                            }}
+                              className="text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
+                              Přidat vlastníky
+                            </button>
+                          )}
                           {aktivniNajemnik.some(n => !aktivniBydlici.some(b => b.osoby.id === n.osoby.id)) && (
                             <button onClick={handleNajemniciJakoBydlici}
                               className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
