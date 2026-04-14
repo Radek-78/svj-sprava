@@ -154,8 +154,12 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [avDatum, setAvDatum] = useState(new Date().toISOString().split('T')[0])
 
   // Add nájemník / bydlící form
-  const [anOsoba, setAnOsoba] = useState('')
+  const [anOsoby, setAnOsoby] = useState<string[]>([])
   const [anDatum, setAnDatum] = useState(new Date().toISOString().split('T')[0])
+
+  function toggleAnOsoba(id: string) {
+    setAnOsoby(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
 
   // Add čip form
   const [acCislo, setAcCislo] = useState('')
@@ -249,12 +253,12 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   }
 
   function openAddNajemnik() {
-    setAnOsoba(''); setAnDatum(new Date().toISOString().split('T')[0])
+    setAnOsoby([]); setAnDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-najemnik')
   }
 
-  function openAddBydlici() {
-    setAnOsoba(''); setAnDatum(new Date().toISOString().split('T')[0])
+  function openAddBydlici(preselect: string[] = []) {
+    setAnOsoby(preselect); setAnDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-bydlici')
   }
 
@@ -315,18 +319,34 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     setUkladani(false)
   }
 
-  // ── Přidat nájemníka / bydlícího ──
+  // ── Přidat nájemníka / bydlícího (hromadně) ──
   async function handleAddVazba(role: 'najemnik' | 'bydlici') {
-    if (!vybranaId || !anOsoba) return
+    if (!vybranaId || anOsoby.length === 0) return
     setUkladani(true); setChyba('')
-    const { error } = await supabase.from('jednotky_osoby').insert({
-      jednotka_id: vybranaId, osoba_id: anOsoba, role, datum_od: anDatum, je_aktivni: true,
-    })
+    const zaznamy = anOsoby.map(oid => ({
+      jednotka_id: vybranaId, osoba_id: oid, role, datum_od: anDatum, je_aktivni: true,
+    }))
+    const { error } = await supabase.from('jednotky_osoby').insert(zaznamy)
     if (error) { setChyba(error.message); setUkladani(false); return }
     await refreshJednotky()
     router.refresh()
     setView('detail')
     setUkladani(false)
+  }
+
+  // ── Rychlé přidání nájemníků jako bydlících ──
+  async function handleNajemniciJakoBydlici() {
+    if (!vybranaId) return
+    const bydliciIds = new Set(aktivniBydlici.map(b => b.osoby.id))
+    const kPridani = aktivniNajemnik.filter(n => !bydliciIds.has(n.osoby.id))
+    if (kPridani.length === 0) return
+    const zaznamy = kPridani.map(n => ({
+      jednotka_id: vybranaId, osoba_id: n.osoby.id, role: 'bydlici',
+      datum_od: new Date().toISOString().split('T')[0], je_aktivni: true,
+    }))
+    await supabase.from('jednotky_osoby').insert(zaznamy)
+    await refreshJednotky()
+    router.refresh()
   }
 
   // ── Přidat čip ──
@@ -498,10 +518,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
         <PageTbody>
           {filtrovane.length === 0 && <PageEmpty text={hledani ? 'Žádná jednotka neodpovídá hledání.' : 'Zatím žádné jednotky.'} />}
           {filtrovane.map(j => {
-            const naj = j.jednotky_osoby.find(v => v.role === 'najemnik' && v.je_aktivni)
+            const najemnici = j.jednotky_osoby.filter(v => v.role === 'najemnik' && v.je_aktivni)
             const pocetBydlici = j.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
             const maVlastnika = j.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)
-            const maNajemnika = !!naj
+            const maNajemnika = najemnici.length > 0
             const aktivniVlastnici = j.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni)
             return (
               <PageTr key={j.id} onClick={() => openModal(j.id)}>
@@ -511,7 +531,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                 <PageTd className="tabular-nums">{j.uzitna_plocha ? `${j.uzitna_plocha} m²` : <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd className="tabular-nums text-xs text-zinc-500">{j.podil_citatel && j.podil_jmenovatel ? `${j.podil_citatel}/${j.podil_jmenovatel}` : <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd>{renderVlastnikCell(j)}</PageTd>
-                <PageTd>{naj ? <span className="text-zinc-700">{formatJmeno(naj.osoby)}</span> : <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd>{najemnici.length > 0 ? <span className="text-zinc-700 text-sm">{najemnici.map(n => formatJmeno(n.osoby)).join(', ')}</span> : <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd center>
                   {pocetBydlici > 0
                     ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">{pocetBydlici}</span>
@@ -781,7 +801,15 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                           </div>
                           <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Hlášeni k pobytu</p>
                         </div>
-                        <button onClick={openAddBydlici} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ PŘIDAT</button>
+                        <div className="flex items-center gap-1.5">
+                          {aktivniNajemnik.some(n => !aktivniBydlici.some(b => b.osoby.id === n.osoby.id)) && (
+                            <button onClick={handleNajemniciJakoBydlici}
+                              className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
+                              Přidat nájemníky
+                            </button>
+                          )}
+                          <button onClick={() => openAddBydlici()} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ PŘIDAT</button>
+                        </div>
                       </div>
                       {aktivniBydlici.length === 0 ? (
                         <p className="text-xs text-zinc-400 italic px-1">Nikdo není hlášen</p>
@@ -1004,23 +1032,40 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
               {(view === 'add-najemnik' || view === 'add-bydlici') && (
                 <div className="flex-1 overflow-y-auto">
                 <div className="px-6 py-5 space-y-4">
+
+                  {/* Rychlý výběr nájemníků při přidávání k pobytu */}
+                  {view === 'add-bydlici' && aktivniNajemnik.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Nájemníci v bytě</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {aktivniNajemnik.map(n => {
+                          const selected = anOsoby.includes(n.osoby.id)
+                          return (
+                            <button key={n.id} type="button" onClick={() => toggleAnOsoba(n.osoby.id)}
+                              className={`text-xs px-2.5 py-1 rounded-lg font-medium border transition-colors ${selected ? 'bg-amber-500 text-white border-amber-500' : 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100'}`}>
+                              {formatJmeno(n.osoby)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className={LABEL}>Osoba</label>
-                    <select
-                      value={anOsoba}
-                      onChange={e => {
-                        const sid = e.target.value
-                        setAnOsoba(sid)
-                        const vl = aktivniVlastnici.find(v => v.osoby.id === sid)
-                        if (vl?.datum_od) setAnDatum(vl.datum_od)
-                        else setAnDatum(new Date().toISOString().split('T')[0])
-                      }}
-                      className={INPUT}
-                    >
-                      <option value="">— vyberte osobu —</option>
-                      {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
-                    </select>
+                    <label className={LABEL}>
+                      {view === 'add-najemnik' ? 'Osoby' : 'Osoby'}{anOsoby.length > 0 && <span className="ml-1.5 text-violet-600 font-semibold">({anOsoby.length} vybráno)</span>}
+                    </label>
+                    <div className="border border-zinc-200 rounded-lg overflow-hidden max-h-52 overflow-y-auto">
+                      {vsechnyOsoby.map(o => (
+                        <label key={o.id} className={`flex items-center gap-2.5 px-3 py-2 cursor-pointer transition-colors border-b border-zinc-50 last:border-0 ${anOsoby.includes(o.id) ? 'bg-violet-50' : 'hover:bg-zinc-50'}`}>
+                          <input type="checkbox" checked={anOsoby.includes(o.id)} onChange={() => toggleAnOsoba(o.id)}
+                            className="w-4 h-4 rounded accent-violet-600" />
+                          <span className="text-sm text-zinc-800">{formatJmeno(o)}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
+
                   <div>
                     <label className={LABEL}>{view === 'add-najemnik' ? 'Nájemník od' : 'Hlášen od'}</label>
                     <input type="date" value={anDatum} onChange={e => setAnDatum(e.target.value)} className={INPUT} />
@@ -1028,9 +1073,9 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                   {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
                   <div className="flex gap-2">
                     <button onClick={() => handleAddVazba(view === 'add-najemnik' ? 'najemnik' : 'bydlici')}
-                      disabled={ukladani || !anOsoba}
+                      disabled={ukladani || anOsoby.length === 0}
                       className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
-                      {ukladani ? 'Ukládám...' : view === 'add-najemnik' ? 'Přiřadit nájemníka' : 'Přidat k pobytu'}
+                      {ukladani ? 'Ukládám...' : view === 'add-najemnik' ? `Přiřadit${anOsoby.length > 1 ? ` (${anOsoby.length})` : ''}` : `Přidat k pobytu${anOsoby.length > 1 ? ` (${anOsoby.length})` : ''}`}
                     </button>
                     <button onClick={() => setView('detail')}
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
