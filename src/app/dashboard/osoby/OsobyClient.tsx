@@ -88,7 +88,7 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 
 const EMPTY_FORM: EditForm = {
   jmeno: '', prijmeni: '', titul: '', email: '', telefon: '',
-  kontaktni_ulice: '', kontaktni_mesto: '', kontaktni_psc: '', poznamka: '',
+  kontaktni_ulice: 'Spojovací 557/', kontaktni_mesto: 'Milovice', kontaktni_psc: '289 24', poznamka: '',
 }
 
 // ─── Formulář osoby — mimo komponentu, aby React neztrácet focus ─────────────
