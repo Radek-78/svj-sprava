@@ -246,7 +246,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
 
   function openAddVlastnik() {
     setAvTyp('individualni'); setAvOsoba1(''); setAvOsoba2('')
-    setAvPodiloveOsoby([{ osobaId: '', citatel: '', jmenovatel: '' }])
+    setAvPodiloveOsoby([{ osobaId: '', citatel: '1', jmenovatel: '1' }])
     setAvDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-vlastnik')
   }
@@ -1018,20 +1018,24 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                             {vsechnyOsoby.map(os => <option key={os.id} value={os.id}>{formatJmeno(os)}</option>)}
                           </select>
                           <input
-                            type="number" min="1" placeholder="1"
+                            type="number" min="1"
                             value={o.citatel}
                             onChange={e => setAvPodiloveOsoby(prev => prev.map((x, j) => j === i ? { ...x, citatel: e.target.value } : x))}
                             className="w-16 border border-zinc-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500"
                           />
                           <span className="text-zinc-400 font-bold">/</span>
                           <input
-                            type="number" min="1" placeholder="3"
+                            type="number" min="1"
                             value={o.jmenovatel}
                             onChange={e => setAvPodiloveOsoby(prev => prev.map((x, j) => j === i ? { ...x, jmenovatel: e.target.value } : x))}
                             className="w-16 border border-zinc-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500"
                           />
                           {avPodiloveOsoby.length > 1 && (
-                            <button type="button" onClick={() => setAvPodiloveOsoby(prev => prev.filter((_, j) => j !== i))}
+                            <button type="button" onClick={() => {
+                              const next = avPodiloveOsoby.filter((_, j) => j !== i)
+                              const n = next.length
+                              setAvPodiloveOsoby(next.map((x, j) => ({ ...x, citatel: String(j + 1), jmenovatel: String(n) })))
+                            }}
                               className="w-8 h-9 flex items-center justify-center text-zinc-400 hover:text-red-500 transition-colors flex-shrink-0">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                             </button>
@@ -1039,7 +1043,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                         </div>
                       ))}
                       <button type="button"
-                        onClick={() => setAvPodiloveOsoby(prev => [...prev, { osobaId: '', citatel: '', jmenovatel: '' }])}
+                        onClick={() => {
+                          const next = [...avPodiloveOsoby, { osobaId: '', citatel: '', jmenovatel: '' }]
+                          const n = next.length
+                          setAvPodiloveOsoby(next.map((x, j) => ({ ...x, citatel: String(j + 1), jmenovatel: String(n) })))
+                        }}
                         className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium py-1 transition-colors">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                         Přidat dalšího vlastníka
