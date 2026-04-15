@@ -296,7 +296,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   // ── Přidat vlastníka ──
   async function handleAddVlastnik(e: React.FormEvent) {
     e.preventDefault()
-    if (!vybranaId || !avOsoba1) return
+    if (!vybranaId) return
+    if (avTyp !== 'podilove' && !avOsoba1) return
     setUkladani(true); setChyba('')
 
     const zaznamy: object[] = []
