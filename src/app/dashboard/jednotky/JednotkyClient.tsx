@@ -136,6 +136,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [chyba, setChyba] = useState('')
 
   const [hledani, setHledani] = useState('')
+  const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'cipy'>('vlastnictvi')
 
   const [editForm, setEditForm] = useState<EditForm>({
     cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
@@ -216,6 +217,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     setView('detail')
     setPotvrzeni(false)
     setChyba('')
+    setDetailTab('vlastnictvi')
   }
 
   function closeModal() {
@@ -720,200 +722,209 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                     </div>
                   </div>
 
-                  {/* 2. SLOUPEC: Osoby (flex-1) */}
-                  <div className="flex-1 overflow-y-auto border-r border-zinc-100 bg-white">
-                    {/* Vlastnictví */}
-                    <div className="px-6 py-4 border-b border-zinc-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                  {/* 2. OBSAH: Tab panel */}
+                  <div className="flex-1 flex flex-col overflow-hidden bg-white">
+
+                    {/* Tab bar */}
+                    <div className="flex items-center gap-0.5 px-4 pt-3 pb-0 border-b border-zinc-100 flex-shrink-0">
+                      {([
+                        { key: 'vlastnictvi', label: 'Vlastnictví', count: aktivniVlastnici.length, color: 'emerald' },
+                        { key: 'najemnik',    label: 'Nájemník',    count: aktivniNajemnik.length,  color: 'amber'   },
+                        { key: 'pobyt',       label: 'Pobyt',       count: aktivniBydlici.length,   color: 'blue'    },
+                        { key: 'cipy',        label: 'Čipy',        count: (vybrana.jednotky_cipy || []).length, color: 'zinc' },
+                      ] as const).map(tab => (
+                        <button key={tab.key} type="button" onClick={() => setDetailTab(tab.key)}
+                          className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors -mb-px ${
+                            detailTab === tab.key
+                              ? 'border-violet-600 text-violet-700'
+                              : 'border-transparent text-zinc-400 hover:text-zinc-600 hover:border-zinc-200'
+                          }`}>
+                          {tab.label}
+                          {tab.count > 0 && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                              detailTab === tab.key ? 'bg-violet-100 text-violet-600' : 'bg-zinc-100 text-zinc-500'
+                            }`}>{tab.count}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Tab obsah */}
+                    <div className="flex-1 overflow-y-auto p-5">
+
+                      {/* ── Vlastnictví ── */}
+                      {detailTab === 'vlastnictvi' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Vlastníci</p>
+                            <button onClick={openAddVlastnik} className="text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ Přidat</button>
                           </div>
-                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Vlastnictví</p>
-                        </div>
-                        <button onClick={openAddVlastnik} className="text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ PŘIDAT</button>
-                      </div>
-                      {aktivniVlastnici.length === 0 ? (
-                        <p className="text-xs text-zinc-400 italic px-1">Nepřiřazen</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {(() => {
-                            const typ = aktivniVlastnici[0].typ_vlastnictvi
-                            if (typ === 'sjm' || typ === 'mcp') {
-                              return (
-                                <div className="bg-zinc-50/50 rounded-xl p-3 border border-zinc-100">
-                                  <div className="flex items-center gap-2.5 mb-2">
-                                    {typVlastnictviBadge(typ)}
-                                    <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{aktivniVlastnici[0].datum_od ? `od ${aktivniVlastnici[0].datum_od}` : ''}</span>
-                                </div>
-                                <div className="space-y-1.5">
-                                  {aktivniVlastnici.map(v => (
-                                    <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-zinc-200/60 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors">
-                                      <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
-                                      <div className="flex items-center gap-1">
-                                        <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold transition-colors">Ukončit</button>
-                                        <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold transition-colors">Smazat</button>
+                          {aktivniVlastnici.length === 0 ? (
+                            <p className="text-sm text-zinc-400 italic">Nepřiřazen</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {(() => {
+                                const typ = aktivniVlastnici[0].typ_vlastnictvi
+                                if (typ === 'sjm' || typ === 'mcp') {
+                                  return (
+                                    <div className="bg-zinc-50/50 rounded-xl p-3 border border-zinc-100">
+                                      <div className="flex items-center gap-2.5 mb-2">
+                                        {typVlastnictviBadge(typ)}
+                                        <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider">{aktivniVlastnici[0].datum_od ? `od ${aktivniVlastnici[0].datum_od}` : ''}</span>
+                                      </div>
+                                      <div className="space-y-1.5">
+                                        {aktivniVlastnici.map(v => (
+                                          <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="flex items-center justify-between bg-white px-2.5 py-2 rounded-lg border border-zinc-200/60 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors">
+                                            <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
+                                            <div className="flex items-center gap-1">
+                                              <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold transition-colors">Ukončit</button>
+                                              <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold transition-colors">Smazat</button>
+                                            </div>
+                                          </div>
+                                        ))}
                                       </div>
                                     </div>
-                                  ))}
+                                  )
+                                }
+                                return aktivniVlastnici.map(v => (
+                                  <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="bg-white rounded-xl p-3 border border-zinc-200 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      {typVlastnictviBadge(v.typ_vlastnictvi)}
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
+                                          {v.podil_citatel && <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-md tabular-nums">{v.podil_citatel}/{v.podil_jmenovatel}</span>}
+                                        </div>
+                                        {v.datum_od && <p className="text-[9px] font-medium text-zinc-400">od {v.datum_od}</p>}
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold">Ukončit</button>
+                                      <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
+                                    </div>
+                                  </div>
+                                ))
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Nájemník ── */}
+                      {detailTab === 'najemnik' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nájemníci</p>
+                            <button onClick={openAddNajemnik} className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ Přidat</button>
+                          </div>
+                          {aktivniNajemnik.length === 0 ? (
+                            <p className="text-sm text-zinc-400 italic">Žádný nájemník</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {aktivniNajemnik.map(n => (
+                                <div key={n.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${n.osoby.id}`) }} className="bg-white rounded-xl p-3 border border-zinc-200 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors flex items-center justify-between">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-zinc-900">{formatJmeno(n.osoby)}</span>
+                                    {n.datum_od && <p className="text-[9px] font-medium text-zinc-400">od {n.datum_od}</p>}
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(n.id) }} className="text-[9px] text-amber-600 hover:bg-amber-100 px-2 py-1 rounded-lg font-bold">Ukončit</button>
+                                    <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(n.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
+                                  </div>
                                 </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Pobyt ── */}
+                      {detailTab === 'pobyt' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Hlášení k pobytu</p>
+                            <div className="flex items-center gap-1.5">
+                              {aktivniVlastnici.some(v => !aktivniBydlici.some(b => b.osoby.id === v.osoby.id)) && (
+                                <button onClick={async () => {
+                                  if (!vybranaId) return
+                                  const bydliciIds = new Set(aktivniBydlici.map(b => b.osoby.id))
+                                  const kPridani = aktivniVlastnici.filter(v => !bydliciIds.has(v.osoby.id))
+                                  await supabase.from('jednotky_osoby').insert(kPridani.map(v => ({
+                                    jednotka_id: vybranaId, osoba_id: v.osoby.id, role: 'bydlici',
+                                    datum_od: new Date().toISOString().split('T')[0], je_aktivni: true,
+                                  })))
+                                  await refreshJednotky(); router.refresh()
+                                }} className="text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
+                                  + Vlastníci
+                                </button>
+                              )}
+                              {aktivniNajemnik.some(n => !aktivniBydlici.some(b => b.osoby.id === n.osoby.id)) && (
+                                <button onClick={handleNajemniciJakoBydlici} className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
+                                  + Nájemníci
+                                </button>
+                              )}
+                              <button onClick={() => openAddBydlici()} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ Přidat</button>
+                            </div>
+                          </div>
+                          {aktivniBydlici.length === 0 ? (
+                            <p className="text-sm text-zinc-400 italic">Nikdo není hlášen</p>
+                          ) : (
+                            <div className="border border-zinc-100 rounded-xl divide-y divide-zinc-50">
+                              {aktivniBydlici.map(b => (
+                                <div key={b.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${b.osoby.id}`) }} className="px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-violet-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
+                                  <span className="text-xs font-medium text-zinc-900">{formatJmeno(b.osoby)}</span>
+                                  <div className="flex items-center gap-1">
+                                    <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(b.id) }} className="text-[9px] text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded-md font-bold">Odhlásit</button>
+                                    <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(b.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-0.5 rounded-md font-bold">Smazat</button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Čipy ── */}
+                      {detailTab === 'cipy' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Čipy</p>
+                            <button onClick={openAddCip} className="text-[10px] bg-zinc-900 text-white hover:bg-zinc-700 font-bold px-2.5 py-1 rounded-lg transition-colors">+ Přidat</button>
+                          </div>
+                          {(() => {
+                            const serazeneCipy = [...(vybrana.jednotky_cipy || [])].sort((a, b) => {
+                              const an = parseInt(a.cislo_cipu.match(/\d+/)?.[0] || '0')
+                              const bn = parseInt(b.cislo_cipu.match(/\d+/)?.[0] || '0')
+                              return an - bn || a.cislo_cipu.localeCompare(b.cislo_cipu)
+                            })
+                            if (serazeneCipy.length === 0) return <p className="text-sm text-zinc-400 italic">Žádné čipy</p>
+                            return (
+                              <div className="space-y-1.5">
+                                {serazeneCipy.map(c => (
+                                  <div key={c.id} className="bg-white rounded-xl p-2.5 border border-zinc-200 shadow-sm hover:border-zinc-300 transition-all">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center justify-between mb-1">
+                                          <span className="text-xs font-black text-zinc-900">{c.cislo_cipu}</span>
+                                          {c.datum_predani && <span className="text-[9px] font-bold text-zinc-400 tabular-nums">{new Date(c.datum_predani).toLocaleDateString('cs-CZ')}</span>}
+                                        </div>
+                                        <p className="text-[11px] font-bold text-zinc-700 truncate">
+                                          {c.osoby ? formatJmeno(c.osoby) : c.externi_prijemce || <span className="text-zinc-300 font-normal italic">nepřiřazen</span>}
+                                        </p>
+                                        {c.poznamka && <p className="text-[9px] text-zinc-400 leading-tight mt-1 line-clamp-1">{c.poznamka}</p>}
+                                      </div>
+                                      <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-300 hover:text-red-500 flex-shrink-0">
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             )
-                          }
-                          return aktivniVlastnici.map(v => (
-                            <div key={v.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${v.osoby.id}`) }} className="bg-white rounded-xl p-3 border border-zinc-200 shadow-sm cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors flex items-center justify-between group">
-                              <div className="flex items-center gap-3">
-                                {typVlastnictviBadge(v.typ_vlastnictvi)}
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-zinc-900">{formatJmeno(v.osoby)}</span>
-                                    {v.podil_citatel && <span className="text-[10px] font-black text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-md tabular-nums">{v.podil_citatel}/{v.podil_jmenovatel}</span>}
-                                  </div>
-                                  {v.datum_od && <p className="text-[9px] font-medium text-zinc-400">od {v.datum_od}</p>}
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(v.id) }} className="text-[9px] text-amber-500 hover:bg-amber-50 px-2 py-1 rounded-lg font-bold">Ukončit</button>
-                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(v.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
-                              </div>
-                            </div>
-                          ))
-                        })()}
-                      </div>
-                    )}
-                    </div>
-
-                    {/* Nájemník */}
-                    <div className="px-6 py-4 border-b border-zinc-100">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                          </div>
-                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Nájemník</p>
-                        </div>
-                        <button onClick={openAddNajemnik} className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ PŘIDAT</button>
-                      </div>
-                      {aktivniNajemnik.length === 0 ? (
-                        <p className="text-xs text-zinc-400 italic px-1">Nepřiřazen</p>
-                      ) : (
-                        <div className="space-y-2">
-                          {aktivniNajemnik.map(n => (
-                            <div key={n.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${n.osoby.id}`) }} className="bg-amber-50/20 rounded-xl p-3 border border-amber-100/50 flex items-center justify-between group cursor-pointer hover:border-violet-200 hover:bg-violet-50 transition-colors">
-                              <div className="flex flex-col">
-                                <span className="text-xs font-bold text-zinc-900">{formatJmeno(n.osoby)}</span>
-                                {n.datum_od && <p className="text-[9px] font-bold text-amber-600/60">od {n.datum_od}</p>}
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(n.id) }} className="text-[9px] text-amber-600 hover:bg-amber-100 px-2 py-1 rounded-lg font-bold">Ukončit</button>
-                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(n.id) }} className="text-[9px] text-red-400 hover:bg-red-50 px-2 py-1 rounded-lg font-bold">Smazat</button>
-                              </div>
-                            </div>
-                          ))}
+                          })()}
                         </div>
                       )}
-                    </div>
 
-                    {/* Hlášeni k pobytu */}
-                    <div className="px-6 py-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-                          </div>
-                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Hlášeni k pobytu</p>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {aktivniVlastnici.some(v => !aktivniBydlici.some(b => b.osoby.id === v.osoby.id)) && (
-                            <button onClick={async () => {
-                              if (!vybranaId) return
-                              const bydliciIds = new Set(aktivniBydlici.map(b => b.osoby.id))
-                              const kPridani = aktivniVlastnici.filter(v => !bydliciIds.has(v.osoby.id))
-                              await supabase.from('jednotky_osoby').insert(kPridani.map(v => ({
-                                jednotka_id: vybranaId, osoba_id: v.osoby.id, role: 'bydlici',
-                                datum_od: new Date().toISOString().split('T')[0], je_aktivni: true,
-                              })))
-                              await refreshJednotky(); router.refresh()
-                            }}
-                              className="text-[10px] bg-emerald-50 text-emerald-600 hover:bg-emerald-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
-                              Přidat vlastníky
-                            </button>
-                          )}
-                          {aktivniNajemnik.some(n => !aktivniBydlici.some(b => b.osoby.id === n.osoby.id)) && (
-                            <button onClick={handleNajemniciJakoBydlici}
-                              className="text-[10px] bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold px-2.5 py-1 rounded-lg transition-colors">
-                              Přidat nájemníky
-                            </button>
-                          )}
-                          <button onClick={() => openAddBydlici()} className="text-[10px] bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold px-2.5 py-1 rounded-lg transition-colors">+ PŘIDAT</button>
-                        </div>
-                      </div>
-                      {aktivniBydlici.length === 0 ? (
-                        <p className="text-xs text-zinc-400 italic px-1">Nikdo není hlášen</p>
-                      ) : (
-                        <div className="bg-blue-50/5 border border-blue-100/30 rounded-xl divide-y divide-blue-50/50">
-                          {aktivniBydlici.map(b => (
-                            <div key={b.id} onClick={() => { closeModal(); router.push(`/dashboard/osoby?open=${b.osoby.id}`) }} className="px-3 py-2 flex items-center justify-between group cursor-pointer hover:bg-violet-50 transition-colors first:rounded-t-xl last:rounded-b-xl">
-                              <span className="text-xs font-medium text-zinc-900">{formatJmeno(b.osoby)}</span>
-                              <div className="flex items-center gap-1">
-                                <button onClick={e => { e.stopPropagation(); handleUkoncitVazbu(b.id) }} className="text-[9px] text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded-md font-bold">Odhlásit</button>
-                                <button onClick={e => { e.stopPropagation(); handleSmazatVazbu(b.id) }} className="text-[9px] text-red-300 hover:bg-red-50 px-2 py-0.5 rounded-md font-bold">Smazat</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* 3. SLOUPEC: Čipy (w-72) */}
-                  <div className="w-72 flex-shrink-0 flex flex-col overflow-y-auto bg-zinc-50/20">
-                    <div className="p-5">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="p-1.5 rounded-lg bg-zinc-900 text-zinc-100 shadow-md">
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-                          </div>
-                          <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Čipy</p>
-                        </div>
-                        <button onClick={openAddCip} className="text-[9px] bg-zinc-950 text-white hover:bg-zinc-800 font-bold px-2 py-1 rounded-md transition-all">+ PŘIDAT</button>
-                      </div>
-
-                      {(() => {
-                        const serazeneCipy = [...(vybrana.jednotky_cipy || [])].sort((a, b) => {
-                          const an = parseInt(a.cislo_cipu.match(/\d+/)?.[0] || '0')
-                          const bn = parseInt(b.cislo_cipu.match(/\d+/)?.[0] || '0')
-                          return an - bn || a.cislo_cipu.localeCompare(b.cislo_cipu)
-                        })
-
-                        if (serazeneCipy.length === 0) return <p className="text-xs text-zinc-400 italic px-1">Žádné čipy</p>
-
-                        return (
-                          <div className="space-y-1.5">
-                            {serazeneCipy.map(c => (
-                              <div key={c.id} className="group relative bg-white rounded-xl p-2.5 border border-zinc-200 shadow-sm transition-all hover:border-zinc-300">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-xs font-black text-zinc-900">{c.cislo_cipu}</span>
-                                      {c.datum_predani && <span className="text-[9px] font-bold text-zinc-400 tabular-nums">{new Date(c.datum_predani).toLocaleDateString('cs-CZ')}</span>}
-                                    </div>
-                                    <p className="text-[11px] font-bold text-zinc-700 truncate">
-                                      {c.osoby ? formatJmeno(c.osoby) : c.externi_prijemce || <span className="text-zinc-300 font-normal italic">nepřiřazen</span>}
-                                    </p>
-                                    {c.poznamka && (
-                                      <p className="text-[9px] text-zinc-400 leading-tight mt-1 line-clamp-1">{c.poznamka}</p>
-                                    )}
-                                  </div>
-                                  <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-300 hover:text-red-500 flex-shrink-0">
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )
-                      })()}
                     </div>
                   </div>
                 </div>
