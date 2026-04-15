@@ -76,7 +76,7 @@ function typVlastnictviLabel(typ: string | null) {
     individualni: 'Individuální',
     podilove: 'Podílové',
     sjm: 'SJM',
-    mcp: 'MCP',
+    mcp: 'Manželé cizího práva',
   }
   return typ ? (map[typ] ?? typ) : ''
 }
@@ -996,6 +996,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                     <div className="grid grid-cols-4 gap-2">
                       {(['individualni', 'podilove', 'sjm', 'mcp'] as const).map(t => (
                         <button key={t} type="button" onClick={() => setAvTyp(t)}
+                          title={t === 'sjm' ? 'Společné jmění manželů' : t === 'mcp' ? 'Manželé cizího práva' : undefined}
                           className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${avTyp === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
                           {t === 'individualni' ? 'Individuální' : t === 'podilove' ? 'Podílové' : t.toUpperCase()}
                         </button>

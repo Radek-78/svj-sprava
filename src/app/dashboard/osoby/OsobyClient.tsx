@@ -78,9 +78,12 @@ function typVlastnictviBadge(typ: string | null) {
     mcp:      'bg-indigo-50 text-indigo-700 ring-indigo-200',
     podilove: 'bg-violet-50 text-violet-700 ring-violet-200',
   }
+  const labels: Record<string, string> = { sjm: 'SJM', mcp: 'MCP', podilove: 'Podílové' }
   return (
-    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 ${colors[typ] ?? 'bg-zinc-100 text-zinc-600'}`}>
-      {typ.toUpperCase()}
+    <span
+      title={typ === 'sjm' ? 'Společné jmění manželů' : typ === 'mcp' ? 'Manželé cizího práva' : undefined}
+      className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold ring-1 ${colors[typ] ?? 'bg-zinc-100 text-zinc-600'}`}>
+      {labels[typ] ?? typ.toUpperCase()}
     </span>
   )
 }
