@@ -147,10 +147,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [avTyp, setAvTyp] = useState<'individualni' | 'podilove' | 'sjm' | 'mcp'>('individualni')
   const [avOsoba1, setAvOsoba1] = useState('')
   const [avOsoba2, setAvOsoba2] = useState('')
-  const [avPodilC, setAvPodilC] = useState('')
-  const [avPodilJ, setAvPodilJ] = useState('')
-  const [avPodilC2, setAvPodilC2] = useState('')
-  const [avPodilJ2, setAvPodilJ2] = useState('')
+  const [avPodiloveOsoby, setAvPodiloveOsoby] = useState<{ osobaId: string; citatel: string; jmenovatel: string }[]>([{ osobaId: '', citatel: '', jmenovatel: '' }])
   const [avDatum, setAvDatum] = useState(new Date().toISOString().split('T')[0])
 
   // Add nájemník / bydlící form
@@ -249,7 +246,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
 
   function openAddVlastnik() {
     setAvTyp('individualni'); setAvOsoba1(''); setAvOsoba2('')
-    setAvPodilC(''); setAvPodilJ(''); setAvPodilC2(''); setAvPodilJ2('')
+    setAvPodiloveOsoby([{ osobaId: '', citatel: '', jmenovatel: '' }])
     setAvDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-vlastnik')
   }
@@ -310,8 +307,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba1, role: 'vlastnik', typ_vlastnictvi: avTyp, datum_od: avDatum, je_aktivni: true })
       if (avOsoba2) zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba2, role: 'vlastnik', typ_vlastnictvi: avTyp, datum_od: avDatum, je_aktivni: true })
     } else if (avTyp === 'podilove') {
-      zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba1, role: 'vlastnik', typ_vlastnictvi: 'podilove', podil_citatel: parseInt(avPodilC) || null, podil_jmenovatel: parseInt(avPodilJ) || null, datum_od: avDatum, je_aktivni: true })
-      if (avOsoba2) zaznamy.push({ jednotka_id: vybranaId, osoba_id: avOsoba2, role: 'vlastnik', typ_vlastnictvi: 'podilove', podil_citatel: parseInt(avPodilC2) || null, podil_jmenovatel: parseInt(avPodilJ2) || null, datum_od: avDatum, je_aktivni: true })
+      for (const o of avPodiloveOsoby) {
+        if (!o.osobaId) continue
+        zaznamy.push({ jednotka_id: vybranaId, osoba_id: o.osobaId, role: 'vlastnik', typ_vlastnictvi: 'podilove', podil_citatel: parseInt(o.citatel) || null, podil_jmenovatel: parseInt(o.jmenovatel) || null, datum_od: avDatum, je_aktivni: true })
+      }
     }
 
     const { error } = await supabase.from('jednotky_osoby').insert(zaznamy)
@@ -1004,48 +1003,66 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                     </div>
                   </div>
 
-                  <div>
-                    <label className={LABEL}>{avTyp === 'sjm' || avTyp === 'mcp' ? 'Osoba 1' : 'Osoba'}</label>
-                    <select value={avOsoba1} onChange={e => setAvOsoba1(e.target.value)} required className={INPUT}>
-                      <option value="">— vyberte osobu —</option>
-                      {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
-                    </select>
-                  </div>
-
-                  {avTyp === 'podilove' && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <label className={LABEL}>Podíl – čitatel</label>
-                        <input type="number" value={avPodilC} onChange={e => setAvPodilC(e.target.value)} placeholder="1" className={INPUT} />
-                      </div>
-                      <div>
-                        <label className={LABEL}>Jmenovatel</label>
-                        <input type="number" value={avPodilJ} onChange={e => setAvPodilJ(e.target.value)} placeholder="2" className={INPUT} />
-                      </div>
+                  {avTyp === 'podilove' ? (
+                    <div className="space-y-2">
+                      <label className={LABEL}>Vlastníci a jejich podíly</label>
+                      {avPodiloveOsoby.map((o, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <select
+                            value={o.osobaId}
+                            onChange={e => setAvPodiloveOsoby(prev => prev.map((x, j) => j === i ? { ...x, osobaId: e.target.value } : x))}
+                            className={`${INPUT} flex-1`}
+                          >
+                            <option value="">— vyberte osobu —</option>
+                            {vsechnyOsoby.map(os => <option key={os.id} value={os.id}>{formatJmeno(os)}</option>)}
+                          </select>
+                          <input
+                            type="number" min="1" placeholder="1"
+                            value={o.citatel}
+                            onChange={e => setAvPodiloveOsoby(prev => prev.map((x, j) => j === i ? { ...x, citatel: e.target.value } : x))}
+                            className="w-16 border border-zinc-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          />
+                          <span className="text-zinc-400 font-bold">/</span>
+                          <input
+                            type="number" min="1" placeholder="3"
+                            value={o.jmenovatel}
+                            onChange={e => setAvPodiloveOsoby(prev => prev.map((x, j) => j === i ? { ...x, jmenovatel: e.target.value } : x))}
+                            className="w-16 border border-zinc-200 rounded-lg px-2 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-violet-500"
+                          />
+                          {avPodiloveOsoby.length > 1 && (
+                            <button type="button" onClick={() => setAvPodiloveOsoby(prev => prev.filter((_, j) => j !== i))}
+                              className="w-8 h-9 flex items-center justify-center text-zinc-400 hover:text-red-500 transition-colors flex-shrink-0">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button type="button"
+                        onClick={() => setAvPodiloveOsoby(prev => [...prev, { osobaId: '', citatel: '', jmenovatel: '' }])}
+                        className="flex items-center gap-1.5 text-xs text-violet-600 hover:text-violet-800 font-medium py-1 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                        Přidat dalšího vlastníka
+                      </button>
                     </div>
-                  )}
-
-                  {(avTyp === 'sjm' || avTyp === 'mcp' || avTyp === 'podilove') && (
-                    <div>
-                      <label className={LABEL}>Osoba 2</label>
-                      <select value={avOsoba2} onChange={e => setAvOsoba2(e.target.value)} className={INPUT}>
-                        <option value="">— vyberte osobu —</option>
-                        {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
-                      </select>
-                    </div>
-                  )}
-
-                  {avTyp === 'podilove' && avOsoba2 && (
-                    <div className="grid grid-cols-2 gap-2">
+                  ) : (
+                    <>
                       <div>
-                        <label className={LABEL}>Podíl osoby 2 – čitatel</label>
-                        <input type="number" value={avPodilC2} onChange={e => setAvPodilC2(e.target.value)} className={INPUT} />
+                        <label className={LABEL}>{avTyp === 'sjm' || avTyp === 'mcp' ? 'Osoba 1' : 'Osoba'}</label>
+                        <select value={avOsoba1} onChange={e => setAvOsoba1(e.target.value)} required className={INPUT}>
+                          <option value="">— vyberte osobu —</option>
+                          {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                        </select>
                       </div>
-                      <div>
-                        <label className={LABEL}>Jmenovatel</label>
-                        <input type="number" value={avPodilJ2} onChange={e => setAvPodilJ2(e.target.value)} className={INPUT} />
-                      </div>
-                    </div>
+                      {(avTyp === 'sjm' || avTyp === 'mcp') && (
+                        <div>
+                          <label className={LABEL}>Osoba 2</label>
+                          <select value={avOsoba2} onChange={e => setAvOsoba2(e.target.value)} className={INPUT}>
+                            <option value="">— vyberte osobu —</option>
+                            {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </>
                   )}
 
                   <div>
@@ -1054,7 +1071,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                   </div>
                   {chyba && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{chyba}</p>}
                   <div className="flex gap-2">
-                    <button type="submit" disabled={ukladani || !avOsoba1}
+                    <button type="submit"
+                      disabled={ukladani || (avTyp === 'podilove' ? avPodiloveOsoby.every(o => !o.osobaId) : !avOsoba1)}
                       className="flex-1 bg-zinc-950 text-white text-sm py-2.5 rounded-xl hover:bg-zinc-800 transition-colors font-medium disabled:opacity-40">
                       {ukladani ? 'Ukládám...' : 'Přiřadit vlastníka'}
                     </button>
