@@ -28,6 +28,8 @@ type Osoba = {
   titul: string | null
   email: string | null
   telefon: string | null
+  email_overeno: boolean
+  telefon_overeno: boolean
   kontaktni_ulice: string | null
   kontaktni_mesto: string | null
   kontaktni_psc: string | null
@@ -300,6 +302,12 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
     await refreshOsoby(); router.refresh(); closeModal(); setMazani(false)
   }
 
+  async function toggleOvereni(field: 'email_overeno' | 'telefon_overeno') {
+    if (!vybranaId || !vybrana) return
+    const { error } = await supabase.from('osoby').update({ [field]: !vybrana[field] }).eq('id', vybranaId)
+    if (!error) await refreshOsoby()
+  }
+
   const formProps = { editForm, setEditForm, view, closeModal, setView, ukladani, chyba }
 
   return (
@@ -340,8 +348,22 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     <span className="font-medium text-zinc-900 group-hover:text-violet-700 transition-colors">{formatJmeno(osoba)}</span>
                     {osoba.titul && <span className="ml-1.5 text-xs text-zinc-400">{osoba.titul}</span>}
                   </PageTd>
-                  <PageTd>{osoba.email ?? <span className="text-zinc-300">—</span>}</PageTd>
-                  <PageTd>{kontakt || <span className="text-zinc-300">—</span>}</PageTd>
+                  <PageTd>
+                    {osoba.email
+                      ? <span className="inline-flex items-center gap-1.5">
+                          <span>{osoba.email}</span>
+                          {osoba.email_overeno && <VerifiedBadge />}
+                        </span>
+                      : <span className="text-zinc-300">—</span>}
+                  </PageTd>
+                  <PageTd>
+                    {kontakt
+                      ? <span className="inline-flex items-center gap-1.5">
+                          <span>{kontakt}</span>
+                          {osoba.telefon_overeno && <VerifiedBadge />}
+                        </span>
+                      : <span className="text-zinc-300">—</span>}
+                  </PageTd>
                   <PageTd>{adresa || <span className="text-zinc-300">—</span>}</PageTd>
                   <PageTd>
                     {aktivniVazby.length === 0 ? <span className="text-zinc-300">—</span> : (
@@ -430,12 +452,12 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     <div className="p-5 flex-1 space-y-1">
                       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Kontakt</p>
 
-                      <ContactRow icon="email" label="E-mail">
+                      <ContactRow icon="email" label="E-mail" verified={vybrana.email_overeno} onToggleVerified={vybrana.email ? () => toggleOvereni('email_overeno') : undefined}>
                         {vybrana.email
                           ? <a href={`mailto:${vybrana.email}`} className="text-xs text-zinc-800 hover:text-violet-600 transition-colors break-all leading-relaxed">{vybrana.email}</a>
                           : <span className="text-sm text-zinc-300">—</span>}
                       </ContactRow>
-                      <ContactRow icon="phone" label="Telefon">
+                      <ContactRow icon="phone" label="Telefon" verified={vybrana.telefon_overeno} onToggleVerified={vybrana.telefon ? () => toggleOvereni('telefon_overeno') : undefined}>
                         {vybrana.telefon
                           ? <a href={`tel:${vybrana.telefon}`} className="text-sm text-zinc-800 hover:text-violet-600 transition-colors">{vybrana.telefon}</a>
                           : <span className="text-sm text-zinc-300">—</span>}
@@ -582,16 +604,51 @@ const ICONS = {
   ),
 }
 
-function ContactRow({ icon, label, children }: { icon: keyof typeof ICONS; label: string; children: React.ReactNode }) {
+function ContactRow({ icon, label, children, verified, onToggleVerified }: {
+  icon: keyof typeof ICONS
+  label: string
+  children: React.ReactNode
+  verified?: boolean
+  onToggleVerified?: () => void
+}) {
   return (
     <div className="flex items-start gap-2.5 py-2 border-b border-zinc-50 last:border-0">
       <div className="w-6 h-6 rounded-md bg-zinc-100 flex items-center justify-center flex-shrink-0 mt-0.5 text-zinc-400">
         {ICONS[icon]}
       </div>
-      <div className="min-w-0">
-        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide leading-none mb-0.5">{label}</p>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between mb-0.5">
+          <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide leading-none">{label}</p>
+          {onToggleVerified && (
+            <button
+              type="button"
+              onClick={onToggleVerified}
+              title={verified ? 'Ověřeno – kliknutím zrušit' : 'Kliknutím označit jako ověřeno'}
+              className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold transition-colors ${
+                verified
+                  ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200 hover:bg-red-50 hover:text-red-500 hover:ring-red-200'
+                  : 'bg-zinc-100 text-zinc-400 ring-1 ring-zinc-200 hover:bg-emerald-50 hover:text-emerald-600 hover:ring-emerald-200'
+              }`}
+            >
+              {verified
+                ? <><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Ověřeno</>
+                : <><svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> Neověřeno</>
+              }
+            </button>
+          )}
+        </div>
         {children}
       </div>
     </div>
+  )
+}
+
+function VerifiedBadge() {
+  return (
+    <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex-shrink-0" title="Ověřeno">
+      <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+      </svg>
+    </span>
   )
 }
