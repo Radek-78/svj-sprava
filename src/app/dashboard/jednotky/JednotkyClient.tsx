@@ -1059,7 +1059,6 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                         </button>
                       ))}
                     </div>
-                  </div>
 
                   {avTyp === 'podilove' ? (
                     <div className="space-y-2">
