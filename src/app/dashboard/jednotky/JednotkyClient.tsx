@@ -1,9 +1,5 @@
-'use client'
-
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
+import OsobaForm, { EditForm as OsobaEditForm, EMPTY_FORM as EMPTY_OSOBA_FORM } from '@/components/OsobaForm'
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +45,7 @@ type Jednotka = {
   jednotky_cipy: Cip[]
 }
 
-type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici' | 'add-cip'
+type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici' | 'add-cip' | 'add-osoba'
 
 type EditForm = {
   cislo_jednotky: string
@@ -139,10 +135,14 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'cipy'>('vlastnictvi')
 
   const [editForm, setEditForm] = useState<EditForm>({
-    cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
-    vytapena_plocha: '', podil_citatel: '', podil_jmenovatel: '10000',
     pocet_pokoju: '', poznamka: '',
   })
+
+  // Osoba form
+  const [osobaForm, setOsobaForm] = useState<OsobaEditForm>(EMPTY_OSOBA_FORM)
+  const [osobaFormUkladani, setOsobaFormUkladani] = useState(false)
+  const [osobaFormChyba, setOsobaFormChyba] = useState('')
+  const [viewPredOsobou, setViewPredOsobou] = useState<ModalView>('detail')
 
   // Add vlastník form
   const [avTyp, setAvTyp] = useState<'individualni' | 'podilove' | 'sjm' | 'mcp'>('individualni')
@@ -268,6 +268,49 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     setAcCislo(''); setAcPoznamka(''); setAcTypPrijemce('osoba'); setAcOsobaId(''); setAcExterniJmeno('')
     setAcDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-cip')
+  }
+
+  function openAddOsoba() {
+    setViewPredOsobou(view)
+    setOsobaForm(EMPTY_OSOBA_FORM)
+    setOsobaFormChyba('')
+    setView('add-osoba')
+  }
+
+  // ── Vytvořit novou osobu a vrátit se ──
+  async function handleCreateOsoba(e: React.FormEvent) {
+    e.preventDefault()
+    if (!osobaForm.prijmeni.trim()) { setOsobaFormChyba('Příjmení je povinné'); return }
+    setOsobaFormUkladani(true); setOsobaFormChyba('')
+    
+    // 1. Uložit do DB
+    const { data, error } = await supabase.from('osoby').insert({
+      jmeno: osobaForm.jmeno || null, prijmeni: osobaForm.prijmeni, titul: osobaForm.titul || null,
+      email: osobaForm.email || null, telefon: osobaForm.telefon || null,
+      kontaktni_ulice: osobaForm.kontaktni_ulice || null, kontaktni_mesto: osobaForm.kontaktni_mesto || null,
+      kontaktni_psc: osobaForm.kontaktni_psc || null, poznamka: osobaForm.poznamka || null,
+    }).select().single()
+    
+    if (error) { setOsobaFormChyba(error.message); setOsobaFormUkladani(false); return }
+    
+    // 2. Obnovit seznam všech osob
+    const { data: noveOsoby } = await supabase.from('osoby').select('id, jmeno, prijmeni').order('prijmeni')
+    setVsechnyOsoby(noveOsoby ?? [])
+    
+    // 3. Předvybrat novou osobu v původním formuláři
+    if (viewPredOsobou === 'add-vlastnik') {
+      if (!avOsoba1) setAvOsoba1(data.id)
+      else if (!avOsoba2 && (avTyp === 'sjm' || avTyp === 'mcp')) setAvOsoba2(data.id)
+    } else if (viewPredOsobou === 'add-najemnik' || viewPredOsobou === 'add-bydlici') {
+      setAnOsoby(prev => [...prev, data.id])
+    } else if (viewPredOsobou === 'add-cip') {
+      setAcOsobaId(data.id)
+    }
+
+    // 4. Návrat zpět
+    setView(viewPredOsobou)
+    setOsobaFormUkladani(false)
+    router.refresh()
   }
 
   // ── Uložit úpravu jednotky ──
@@ -610,7 +653,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                   </button>
                 )}
                 <p className="text-[10px] text-zinc-500 uppercase tracking-widest">
-                  {view === 'detail' ? 'Bytová jednotka' : view === 'edit' ? 'Úprava jednotky' : view === 'add-vlastnik' ? 'Přidat vlastníka' : view === 'add-najemnik' ? 'Přidat nájemníka' : 'Přidat osobu k pobytu'}
+                  {view === 'detail' ? 'Bytová jednotka' : view === 'edit' ? 'Úprava jednotky' : view === 'add-vlastnik' ? 'Přidat vlastníka' : view === 'add-najemnik' ? 'Přidat nájemníka' : view === 'add-osoba' ? 'Nová osoba' : 'Přidat osobu k pobytu'}
                 </p>
                 <div className="flex items-baseline gap-3 mt-0.5">
                   <p className="text-2xl font-bold text-white">{vybrana.cislo_jednotky}</p>
@@ -1003,8 +1046,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
               {view === 'add-vlastnik' && (
                 <div className="flex-1 overflow-y-auto">
                 <form onSubmit={handleAddVlastnik} className="px-6 py-5 space-y-4">
-                  <div>
+                  <div className="flex items-center justify-between">
                     <label className={LABEL}>Typ vlastnictví</label>
+                    <button type="button" onClick={openAddOsoba} className="text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2 py-0.5 rounded-md transition-colors">+ Nová osoba</button>
+                  </div>
                     <div className="grid grid-cols-4 gap-2">
                       {(['individualni', 'podilove', 'sjm', 'mcp'] as const).map(t => (
                         <button key={t} type="button" onClick={() => setAvTyp(t)}
@@ -1108,6 +1153,10 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
               {(view === 'add-najemnik' || view === 'add-bydlici') && (
                 <div className="flex-1 overflow-y-auto">
                 <div className="px-6 py-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Výběr osob</p>
+                    <button type="button" onClick={openAddOsoba} className="text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2 py-0.5 rounded-md transition-colors">+ Nová osoba</button>
+                  </div>
 
                   {/* Rychlý výběr nájemníků při přidávání k pobytu */}
                   {view === 'add-bydlici' && aktivniNajemnik.length > 0 && (
@@ -1203,13 +1252,18 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
 
                   <div>
                     <label className={LABEL}>Předáno komu</label>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      {(['osoba', 'externi'] as const).map(t => (
-                        <button key={t} type="button" onClick={() => setAcTypPrijemce(t)}
-                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${acTypPrijemce === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
-                          {t === 'osoba' ? 'Osoba ze seznamu' : 'Externí osoba'}
-                        </button>
-                      ))}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="grid grid-cols-2 gap-2 flex-1">
+                        {(['osoba', 'externi'] as const).map(t => (
+                          <button key={t} type="button" onClick={() => setAcTypPrijemce(t)}
+                            className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${acTypPrijemce === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
+                            {t === 'osoba' ? 'Osoba ze seznamu' : 'Externí osoba'}
+                          </button>
+                        ))}
+                      </div>
+                      {acTypPrijemce === 'osoba' && (
+                        <button type="button" onClick={openAddOsoba} className="ml-2 text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2 py-0.5 rounded-md transition-colors flex-shrink-0">+ Nová osoba</button>
+                      )}
                     </div>
 
                     {acTypPrijemce === 'osoba' ? (
@@ -1237,6 +1291,21 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50">Zrušit</button>
                   </div>
                 </form>
+                </div>
+              )}
+
+              {/* ── ADD OSOBA ── */}
+              {view === 'add-osoba' && (
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                  <OsobaForm 
+                    editForm={osobaForm}
+                    setEditForm={setOsobaForm}
+                    ukladani={osobaFormUkladani}
+                    chyba={osobaFormChyba}
+                    onSubmit={handleCreateOsoba}
+                    onCancel={() => setView(viewPredOsobou)}
+                    submitLabel="Vytvořit a vybrat"
+                  />
                 </div>
               )}
 
