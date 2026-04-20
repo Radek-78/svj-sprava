@@ -1,3 +1,8 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
 import OsobaForm, { EditForm as OsobaEditForm, EMPTY_FORM as EMPTY_OSOBA_FORM } from '@/components/OsobaForm'
 
