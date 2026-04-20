@@ -140,6 +140,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'cipy'>('vlastnictvi')
 
   const [editForm, setEditForm] = useState<EditForm>({
+    cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
+    vytapena_plocha: '', podil_citatel: '', podil_jmenovatel: '10000',
     pocet_pokoju: '', poznamka: '',
   })
 
