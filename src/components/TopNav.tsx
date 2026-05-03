@@ -8,6 +8,7 @@ const navLinks = [
   { href: '/dashboard/prehled', label: 'Přehled' },
   { href: '/dashboard/jednotky', label: 'Jednotky' },
   { href: '/dashboard/osoby', label: 'Osoby' },
+  { href: '/dashboard/cipy', label: 'Čipy' },
 ]
 
 export default function TopNav({ email }: { email: string }) {
