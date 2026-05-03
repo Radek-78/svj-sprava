@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
+import { NAVRHY_VCHODU, type NavrhVchodu } from './navrhyVchodu'
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string }
 type Jednotka = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
@@ -187,6 +188,28 @@ function statusBadge(cip: EvidenceCip) {
   )
 }
 
+function getNavrhVchodu(cip: Pick<Cip, 'cislo_cipu'>): NavrhVchodu | null {
+  const number = getCipNumber(cip.cislo_cipu)
+  return number ? NAVRHY_VCHODU[String(number)] ?? null : null
+}
+
+function navrhVchoduBadge(navrh: NavrhVchodu | null) {
+  if (!navrh) return <span className="text-zinc-300">—</span>
+  const title = navrh.jistota === 'jeden_vchod'
+    ? `Čip otevíral pouze vchod ${navrh.vchod}: ${navrh.otevreni} z ${navrh.celkem} otevření.`
+    : `Dominantní vchod ${navrh.vchod}: ${navrh.otevreni} z ${navrh.celkem} otevření (${navrh.podil} %).`
+  return (
+    <span title={title} className="inline-flex items-center gap-1.5">
+      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-xs font-black ${
+        navrh.jistota === 'jeden_vchod' ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-1 ring-sky-200'
+      }`}>
+        {navrh.vchod}
+      </span>
+      <span className="text-xs text-zinc-400 tabular-nums">{navrh.podil} %</span>
+    </span>
+  )
+}
+
 export default function CipyClient({
   cipy: initialCipy,
   jednotky,
@@ -220,6 +243,7 @@ export default function CipyClient({
       return (
         c.cislo_cipu.toLowerCase().includes(q) ||
         getPrijemce(c).toLowerCase().includes(q) ||
+        (getNavrhVchodu(c)?.vchod.toLowerCase() ?? '').includes(q) ||
         jednotka.includes(q) ||
         (c.stav ? STAV_LABELS[c.stav].toLowerCase().includes(q) : false) ||
         (c.jeEvidovany ? 'evidovaný' : 'volný sklad nepřiděleno').includes(q) ||
@@ -233,6 +257,7 @@ export default function CipyClient({
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
   const volne = evidenceCipy.filter(c => c.jeEvidovany && (c.stav ?? 'aktivni') === 'aktivni' && !c.jednotka_id && !c.osoba_id && !c.externi_prijemce).length
   const nezadane = evidenceCipy.filter(c => !c.jeEvidovany).length
+  const navrhyVchodu = evidenceCipy.filter(c => getNavrhVchodu(c)).length
   const bytySCipy = new Set(evidenceCipy.filter(c => c.jednotka_id).map(c => c.jednotka_id)).size
 
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
@@ -363,6 +388,7 @@ export default function CipyClient({
           { label: 'rezerv', value: rezervy, dot: 'sky', color: 'sky' },
           { label: 'volných', value: volne, dot: 'zinc', color: 'zinc' },
           { label: 'bez záznamu', value: nezadane, dot: 'amber', color: 'amber' },
+          { label: 'návrhů vchodu', value: navrhyVchodu, dot: 'sky', color: 'sky' },
           { label: 'bytů s čipem', value: bytySCipy, dot: 'sky', color: 'sky' },
         ]}
         actions={
@@ -379,6 +405,7 @@ export default function CipyClient({
             <PageTh>Přiděleno komu</PageTh>
             <PageTh>Byt</PageTh>
             <PageTh>Vchod</PageTh>
+            <PageTh>Návrh vchodu</PageTh>
             <PageTh>Datum předání</PageTh>
             <PageTh>Poznámka</PageTh>
           </PageThead>
@@ -405,6 +432,7 @@ export default function CipyClient({
                 <PageTd>
                   {cip.jednotky?.vchod ?? <span className="text-zinc-300">—</span>}
                 </PageTd>
+                <PageTd>{navrhVchoduBadge(getNavrhVchodu(cip))}</PageTd>
                 <PageTd>{cip.datum_predani ?? <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd className="max-w-xs truncate">
                   {cip.poznamka ?? (!cip.jeEvidovany ? <span className="text-zinc-300">bez záznamu</span> : <span className="text-zinc-300">—</span>)}
@@ -469,6 +497,7 @@ export default function CipyClient({
                     <DetailBox label="Stav">{statusBadge(vybrany)}</DetailBox>
                     <DetailBox label="Přiděleno komu">{getPrijemce(vybrany)}</DetailBox>
                     <DetailBox label="Byt a vchod">{formatJednotka(vybrany.jednotky)}</DetailBox>
+                    <DetailBox label="Návrh vchodu">{navrhVchoduBadge(getNavrhVchodu(vybrany))}</DetailBox>
                     <DetailBox label="Typ stavu">{vybrany.stav ? STAV_LABELS[vybrany.stav] : '—'}</DetailBox>
                     <DetailBox label="Evidence">{vybrany.jeEvidovany ? 'Uloženo v evidenci' : 'Zatím bez záznamu'}</DetailBox>
                     <DetailBox label="Datum předání">{vybrany.datum_predani ?? '—'}</DetailBox>
