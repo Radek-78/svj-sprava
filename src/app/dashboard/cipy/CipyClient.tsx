@@ -339,14 +339,31 @@ export default function CipyClient({
 
     const payload = payloadFromForm()
     const shouldInsert = view === 'nova' || !vybrany?.jeEvidovany
-    const { error } = shouldInsert
-      ? await supabase.from('jednotky_cipy').insert(payload)
-      : await supabase.from('jednotky_cipy').update(payload).eq('id', vybranyId)
+    const result = shouldInsert
+      ? await supabase.from('jednotky_cipy').insert(payload, { count: 'exact' })
+      : await supabase.from('jednotky_cipy').update(payload, { count: 'exact' }).eq('id', vybranyId)
 
-    if (error) {
-      setChyba(error.message)
+    if (result.error) {
+      setChyba(result.error.message)
       setUkladani(false)
       return
+    }
+
+    if (!shouldInsert && result.count === 0 && vybrany) {
+      const fallback = await supabase
+        .from('jednotky_cipy')
+        .update(payload, { count: 'exact' })
+        .eq('cislo_cipu', vybrany.cislo_cipu)
+      if (fallback.error) {
+        setChyba(fallback.error.message)
+        setUkladani(false)
+        return
+      }
+      if (fallback.count === 0) {
+        setChyba('Změna se neuložila, databáze nenašla odpovídající čip k úpravě.')
+        setUkladani(false)
+        return
+      }
     }
 
     const refreshed = await refreshCipy()
