@@ -260,7 +260,6 @@ export default function CipyClient({
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
-  const bezZaznamuBezVchodu = bezZaznamu.length - bezZaznamuSVchodem
   const neznameCipy = evidenceCipy.filter(c =>
     !c.jednotka_id &&
     !c.osoba_id &&
@@ -502,7 +501,6 @@ export default function CipyClient({
           { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky' },
           { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber' },
           { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald' },
-          { label: 'zbývá bez vchodu', value: bezZaznamuBezVchodu, dot: 'zinc', color: 'zinc' },
           { label: 'neznámých', value: neznameCipy, dot: 'zinc', color: 'zinc' },
         ]}
         actions={
