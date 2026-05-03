@@ -261,6 +261,14 @@ export default function CipyClient({
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
   const bezZaznamuBezVchodu = bezZaznamu.length - bezZaznamuSVchodem
+  const neznameCipy = evidenceCipy.filter(c =>
+    !c.jednotka_id &&
+    !c.osoba_id &&
+    !c.externi_prijemce &&
+    c.stav !== 'rezerva' &&
+    c.stav !== 'ztraceny' &&
+    !getNavrhVchodu(c)
+  ).length
 
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
   const canPrev = navIndex > 0
@@ -495,6 +503,7 @@ export default function CipyClient({
           { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber' },
           { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald' },
           { label: 'zbývá bez vchodu', value: bezZaznamuBezVchodu, dot: 'zinc', color: 'zinc' },
+          { label: 'neznámých', value: neznameCipy, dot: 'zinc', color: 'zinc' },
         ]}
         actions={
           <>
