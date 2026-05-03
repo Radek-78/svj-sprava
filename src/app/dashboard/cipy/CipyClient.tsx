@@ -228,6 +228,9 @@ export default function CipyClient({
   const [mazani, setMazani] = useState(false)
   const [potvrzeni, setPotvrzeni] = useState(false)
   const [chyba, setChyba] = useState('')
+  const [vybraneIds, setVybraneIds] = useState<Set<string>>(() => new Set())
+  const [hromadneUkladani, setHromadneUkladani] = useState(false)
+  const [hromadnaChyba, setHromadnaChyba] = useState('')
 
   const router = useRouter()
   const supabase = createClient()
@@ -263,6 +266,8 @@ export default function CipyClient({
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
   const canPrev = navIndex > 0
   const canNext = navIndex >= 0 && navIndex < filtrovane.length - 1
+  const vybraneCipy = useMemo(() => evidenceCipy.filter(c => vybraneIds.has(c.id)), [evidenceCipy, vybraneIds])
+  const allFilteredSelected = filtrovane.length > 0 && filtrovane.every(c => vybraneIds.has(c.id))
 
   const refreshCipy = useCallback(async () => {
     const { data } = await supabase
@@ -290,6 +295,29 @@ export default function CipyClient({
     setView('detail')
     setPotvrzeni(false)
     setChyba('')
+  }
+
+  function toggleVybrany(id: string) {
+    setVybraneIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+    setHromadnaChyba('')
+  }
+
+  function toggleVybraneFiltrovane() {
+    setVybraneIds(prev => {
+      const next = new Set(prev)
+      if (allFilteredSelected) {
+        filtrovane.forEach(c => next.delete(c.id))
+      } else {
+        filtrovane.forEach(c => next.add(c.id))
+      }
+      return next
+    })
+    setHromadnaChyba('')
   }
 
   function openNova() {
@@ -375,6 +403,64 @@ export default function CipyClient({
     setUkladani(false)
   }
 
+  async function handleHromadnyStav(stav: CipStav) {
+    if (vybraneCipy.length === 0) return
+    setHromadneUkladani(true)
+    setHromadnaChyba('')
+
+    const existujici = vybraneCipy.filter(c => c.jeEvidovany)
+    const bezZaznamu = vybraneCipy.filter(c => !c.jeEvidovany)
+
+    if (existujici.length > 0) {
+      const ids = existujici.map(c => c.id)
+      const update = await supabase
+        .from('jednotky_cipy')
+        .update({ stav }, { count: 'exact' })
+        .in('id', ids)
+      if (update.error) {
+        setHromadnaChyba(update.error.message)
+        setHromadneUkladani(false)
+        return
+      }
+      if ((update.count ?? 0) < existujici.length) {
+        const cisla = existujici.map(c => c.cislo_cipu)
+        const fallback = await supabase
+          .from('jednotky_cipy')
+          .update({ stav }, { count: 'exact' })
+          .in('cislo_cipu', cisla)
+        if (fallback.error) {
+          setHromadnaChyba(fallback.error.message)
+          setHromadneUkladani(false)
+          return
+        }
+      }
+    }
+
+    if (bezZaznamu.length > 0) {
+      const insert = await supabase
+        .from('jednotky_cipy')
+        .insert(bezZaznamu.map(c => ({
+          cislo_cipu: c.cislo_cipu,
+          stav,
+          jednotka_id: null,
+          osoba_id: null,
+          externi_prijemce: null,
+          datum_predani: null,
+          poznamka: null,
+        })))
+      if (insert.error) {
+        setHromadnaChyba(insert.error.message)
+        setHromadneUkladani(false)
+        return
+      }
+    }
+
+    await refreshCipy()
+    router.refresh()
+    setVybraneIds(new Set())
+    setHromadneUkladani(false)
+  }
+
   async function handleDelete() {
     if (!vybranyId || !vybrany?.jeEvidovany) return
     setMazani(true)
@@ -419,8 +505,46 @@ export default function CipyClient({
           </>
         }
       >
+        {(vybraneIds.size > 0 || hromadnaChyba) && (
+          <div className="px-6 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-zinc-900">{vybraneIds.size} vybráno</p>
+              {hromadnaChyba && <p className="text-xs text-red-600 mt-0.5">{hromadnaChyba}</p>}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {(['aktivni', 'rezerva', 'ztraceny'] as const).map(stav => (
+                <button
+                  key={stav}
+                  type="button"
+                  disabled={hromadneUkladani}
+                  onClick={() => handleHromadnyStav(stav)}
+                  className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100 transition-colors disabled:opacity-50"
+                >
+                  {STAV_LABELS[stav]}
+                </button>
+              ))}
+              <button
+                type="button"
+                disabled={hromadneUkladani}
+                onClick={() => { setVybraneIds(new Set()); setHromadnaChyba('') }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-zinc-500 hover:bg-white transition-colors disabled:opacity-50"
+              >
+                Zrušit výběr
+              </button>
+            </div>
+          </div>
+        )}
         <PageTable>
           <PageThead>
+            <PageTh center>
+              <input
+                type="checkbox"
+                checked={allFilteredSelected}
+                onChange={toggleVybraneFiltrovane}
+                className="w-4 h-4 rounded accent-violet-600"
+                title={allFilteredSelected ? 'Zrušit výběr zobrazených čipů' : 'Vybrat zobrazené čipy'}
+              />
+            </PageTh>
             <PageTh>Čip</PageTh>
             <PageTh>Stav</PageTh>
             <PageTh>Přiděleno komu</PageTh>
@@ -436,6 +560,16 @@ export default function CipyClient({
             )}
             {filtrovane.map(cip => (
               <PageTr key={cip.id} onClick={() => openDetail(cip.id)}>
+                <PageTd center>
+                  <input
+                    type="checkbox"
+                    checked={vybraneIds.has(cip.id)}
+                    onChange={() => toggleVybrany(cip.id)}
+                    onClick={e => e.stopPropagation()}
+                    className="w-4 h-4 rounded accent-violet-600"
+                    title="Vybrat čip pro hromadnou změnu"
+                  />
+                </PageTd>
                 <PageTd>
                   <span className="font-black text-zinc-950 tabular-nums group-hover:text-violet-700 transition-colors">
                     {cip.cislo_cipu}
