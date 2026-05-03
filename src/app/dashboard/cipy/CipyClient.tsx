@@ -63,8 +63,7 @@ function formatJmeno(o: Osoba) {
 
 function formatJednotka(j: Jednotka | null | undefined) {
   if (!j) return 'Sklad / nepřiděleno'
-  const vchod = [j.ulice_vchodu, j.vchod].filter(Boolean).join('/')
-  return vchod ? `Byt ${j.cislo_jednotky}, ${vchod}` : `Byt ${j.cislo_jednotky}`
+  return j.vchod ? `Byt ${j.cislo_jednotky}, vchod ${j.vchod}` : `Byt ${j.cislo_jednotky}`
 }
 
 function getPrijemce(cip: Pick<Cip, 'osoby' | 'externi_prijemce'>) {
@@ -364,7 +363,7 @@ export default function CipyClient({
                   )}
                 </PageTd>
                 <PageTd>
-                  {cip.jednotky ? [cip.jednotky.ulice_vchodu, cip.jednotky.vchod].filter(Boolean).join('/') || <span className="text-zinc-300">—</span> : <span className="text-zinc-300">—</span>}
+                  {cip.jednotky?.vchod ?? <span className="text-zinc-300">—</span>}
                 </PageTd>
                 <PageTd>{cip.datum_predani ?? <span className="text-zinc-300">—</span>}</PageTd>
                 <PageTd className="max-w-xs truncate">
