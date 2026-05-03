@@ -7,10 +7,12 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string }
 type Jednotka = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
+type CipStav = 'aktivni' | 'rezerva' | 'ztraceny'
 
 type Cip = {
   id: string
   cislo_cipu: string
+  stav: CipStav | null
   poznamka: string | null
   osoba_id: string | null
   externi_prijemce: string | null
@@ -35,6 +37,7 @@ type PrijemceTyp = 'zadny' | 'osoba' | 'externi'
 
 type FormState = {
   cislo_cipu: string
+  stav: CipStav
   jednotka_id: string
   prijemce_typ: PrijemceTyp
   osoba_id: string
@@ -45,6 +48,7 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   cislo_cipu: '',
+  stav: 'aktivni',
   jednotka_id: '',
   prijemce_typ: 'zadny',
   osoba_id: '',
@@ -56,6 +60,12 @@ const EMPTY_FORM: FormState = {
 const INVENTARNI_POCET_CIPU = 360
 const INPUT = 'w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white'
 const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
+
+const STAV_LABELS: Record<CipStav, string> = {
+  aktivni: 'Běžný',
+  rezerva: 'Rezerva u správce',
+  ztraceny: 'Ztracený / blokovaný',
+}
 
 function formatJmeno(o: Osoba) {
   return [o.prijmeni, o.jmeno].filter(Boolean).join(' ')
@@ -121,6 +131,7 @@ function buildEvidenceCipy(cipy: Cip[]): EvidenceCip[] {
     return {
       id: `inventar-${cisloCipu}`,
       cislo_cipu: cisloCipu,
+      stav: null,
       poznamka: null,
       osoba_id: null,
       externi_prijemce: null,
@@ -140,6 +151,30 @@ function buildEvidenceCipy(cipy: Cip[]): EvidenceCip[] {
 }
 
 function statusBadge(cip: EvidenceCip) {
+  if (!cip.jeEvidovany) {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 ring-1 ring-amber-200 text-xs font-semibold">
+        Bez záznamu
+      </span>
+    )
+  }
+
+  if (cip.stav === 'rezerva') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 ring-1 ring-sky-200 text-xs font-semibold">
+        Rezerva
+      </span>
+    )
+  }
+
+  if (cip.stav === 'ztraceny') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-50 text-red-700 ring-1 ring-red-200 text-xs font-semibold">
+        Blokovaný
+      </span>
+    )
+  }
+
   const assigned = Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
   return assigned ? (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
@@ -186,6 +221,7 @@ export default function CipyClient({
         c.cislo_cipu.toLowerCase().includes(q) ||
         getPrijemce(c).toLowerCase().includes(q) ||
         jednotka.includes(q) ||
+        (c.stav ? STAV_LABELS[c.stav].toLowerCase().includes(q) : false) ||
         (c.jeEvidovany ? 'evidovaný' : 'volný sklad nepřiděleno').includes(q) ||
         (c.poznamka ?? '').toLowerCase().includes(q)
       )
@@ -194,7 +230,8 @@ export default function CipyClient({
 
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(c => c.jednotka_id || c.osoba_id || c.externi_prijemce).length
-  const volne = celkem - pridelene
+  const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
+  const volne = evidenceCipy.filter(c => c.jeEvidovany && (c.stav ?? 'aktivni') === 'aktivni' && !c.jednotka_id && !c.osoba_id && !c.externi_prijemce).length
   const nezadane = evidenceCipy.filter(c => !c.jeEvidovany).length
   const bytySCipy = new Set(evidenceCipy.filter(c => c.jednotka_id).map(c => c.jednotka_id)).size
 
@@ -206,7 +243,7 @@ export default function CipyClient({
     const { data } = await supabase
       .from('jednotky_cipy')
       .select(`
-        id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, jednotka_id,
+        id, cislo_cipu, stav, poznamka, osoba_id, externi_prijemce, datum_predani, jednotka_id,
         osoby(id, jmeno, prijmeni),
         jednotky(id, cislo_jednotky, vchod, ulice_vchodu)
       `)
@@ -240,6 +277,7 @@ export default function CipyClient({
     if (!vybrany) return
     setForm({
       cislo_cipu: vybrany.cislo_cipu,
+      stav: vybrany.stav ?? 'aktivni',
       jednotka_id: vybrany.jednotka_id ?? '',
       prijemce_typ: vybrany.osoba_id ? 'osoba' : vybrany.externi_prijemce ? 'externi' : 'zadny',
       osoba_id: vybrany.osoba_id ?? '',
@@ -254,6 +292,7 @@ export default function CipyClient({
   function payloadFromForm() {
     return {
       cislo_cipu: form.cislo_cipu.trim(),
+      stav: form.stav,
       jednotka_id: form.jednotka_id || null,
       osoba_id: form.prijemce_typ === 'osoba' ? (form.osoba_id || null) : null,
       externi_prijemce: form.prijemce_typ === 'externi' ? (form.externi_prijemce.trim() || null) : null,
@@ -321,6 +360,7 @@ export default function CipyClient({
         stats={[
           { label: 'celkem', value: celkem },
           { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald' },
+          { label: 'rezerv', value: rezervy, dot: 'sky', color: 'sky' },
           { label: 'volných', value: volne, dot: 'zinc', color: 'zinc' },
           { label: 'bez záznamu', value: nezadane, dot: 'amber', color: 'amber' },
           { label: 'bytů s čipem', value: bytySCipy, dot: 'sky', color: 'sky' },
@@ -429,6 +469,7 @@ export default function CipyClient({
                     <DetailBox label="Stav">{statusBadge(vybrany)}</DetailBox>
                     <DetailBox label="Přiděleno komu">{getPrijemce(vybrany)}</DetailBox>
                     <DetailBox label="Byt a vchod">{formatJednotka(vybrany.jednotky)}</DetailBox>
+                    <DetailBox label="Typ stavu">{vybrany.stav ? STAV_LABELS[vybrany.stav] : '—'}</DetailBox>
                     <DetailBox label="Evidence">{vybrany.jeEvidovany ? 'Uloženo v evidenci' : 'Zatím bez záznamu'}</DetailBox>
                     <DetailBox label="Datum předání">{vybrany.datum_predani ?? '—'}</DetailBox>
                   </div>
@@ -478,6 +519,18 @@ export default function CipyClient({
                     <div>
                       <label className={LABEL}>Datum předání</label>
                       <input type="date" value={form.datum_predani} onChange={e => setForm(p => ({ ...p, datum_predani: e.target.value }))} className={INPUT} disabled={form.prijemce_typ === 'zadny'} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={LABEL}>Stav čipu</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['aktivni', 'rezerva', 'ztraceny'] as const).map(stav => (
+                        <button key={stav} type="button" onClick={() => setForm(p => ({ ...p, stav }))}
+                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${form.stav === stav ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
+                          {STAV_LABELS[stav]}
+                        </button>
+                      ))}
                     </div>
                   </div>
 

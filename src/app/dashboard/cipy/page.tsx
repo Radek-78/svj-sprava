@@ -8,7 +8,7 @@ export default async function CipyPage() {
     supabase
       .from('jednotky_cipy')
       .select(`
-        id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, jednotka_id,
+        id, cislo_cipu, stav, poznamka, osoba_id, externi_prijemce, datum_predani, jednotka_id,
         osoby(id, jmeno, prijmeni),
         jednotky(id, cislo_jednotky, vchod, ulice_vchodu)
       `)
