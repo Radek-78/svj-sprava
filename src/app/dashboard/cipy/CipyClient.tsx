@@ -273,7 +273,9 @@ export default function CipyClient({
         jednotky(id, cislo_jednotky, vchod, ulice_vchodu)
       `)
       .order('cislo_cipu')
-    if (data) setUlozeneCipy((data as unknown as CipRow[]).map(normalizeCip).sort(numericChipSort))
+    const refreshed = data ? (data as unknown as CipRow[]).map(normalizeCip).sort(numericChipSort) : []
+    if (data) setUlozeneCipy(refreshed)
+    return refreshed
   }, [supabase])
 
   function openDetail(id: string) {
@@ -337,9 +339,9 @@ export default function CipyClient({
 
     const payload = payloadFromForm()
     const shouldInsert = view === 'nova' || !vybrany?.jeEvidovany
-    const { data, error } = shouldInsert
-      ? await supabase.from('jednotky_cipy').insert(payload).select('id').single()
-      : await supabase.from('jednotky_cipy').update(payload).eq('id', vybranyId).select('id').single()
+    const { error } = shouldInsert
+      ? await supabase.from('jednotky_cipy').insert(payload)
+      : await supabase.from('jednotky_cipy').update(payload).eq('id', vybranyId)
 
     if (error) {
       setChyba(error.message)
@@ -347,9 +349,11 @@ export default function CipyClient({
       return
     }
 
-    await refreshCipy()
+    const refreshed = await refreshCipy()
     router.refresh()
-    setVybranyId(data.id)
+    const savedNumber = getCipNumber(payload.cislo_cipu)
+    const savedCip = refreshed.find(c => savedNumber ? getCipNumber(c.cislo_cipu) === savedNumber : c.cislo_cipu === payload.cislo_cipu)
+    setVybranyId(savedCip?.id ?? vybranyId)
     setView('detail')
     setUkladani(false)
   }
