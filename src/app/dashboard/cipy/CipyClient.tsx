@@ -506,7 +506,7 @@ export default function CipyClient({
         }
       >
         {(vybraneIds.size > 0 || hromadnaChyba) && (
-          <div className="px-6 py-3 border-b border-zinc-100 bg-zinc-50 flex items-center justify-between gap-4">
+          <div className="sticky top-0 z-30 px-6 py-3 border-b border-violet-100 bg-violet-50/95 backdrop-blur flex items-center justify-between gap-4 shadow-sm">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-900">{vybraneIds.size} vybráno</p>
               {hromadnaChyba && <p className="text-xs text-red-600 mt-0.5">{hromadnaChyba}</p>}
