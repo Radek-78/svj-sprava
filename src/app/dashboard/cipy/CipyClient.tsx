@@ -8,7 +8,7 @@ import { NAVRHY_VCHODU, type NavrhVchodu } from './navrhyVchodu'
 
 type Osoba = { id: string; jmeno: string | null; prijmeni: string }
 type Jednotka = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
-type CipStav = 'aktivni' | 'rezerva' | 'ztraceny'
+type CipStav = 'aktivni' | 'rezerva' | 'dlouhodobe_nepouzit' | 'ztraceny'
 
 type Cip = {
   id: string
@@ -66,6 +66,7 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 const STAV_LABELS: Record<CipStav, string> = {
   aktivni: 'Běžný',
   rezerva: 'Rezerva u správce',
+  dlouhodobe_nepouzit: 'Dlouhodobě nepoužit',
   ztraceny: 'Ztracený / blokovaný',
 }
 
@@ -177,6 +178,14 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
+  if (cip.stav === 'dlouhodobe_nepouzit') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300 text-xs font-semibold">
+        Dlouhodobě nepoužit
+      </span>
+    )
+  }
+
   const assigned = Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
   return assigned ? (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
@@ -219,6 +228,7 @@ function jeNeznamy(cip: EvidenceCip) {
   return (
     !jePrideleny(cip) &&
     cip.stav !== 'rezerva' &&
+    cip.stav !== 'dlouhodobe_nepouzit' &&
     cip.stav !== 'ztraceny' &&
     !getNavrhVchodu(cip)
   )
@@ -550,13 +560,13 @@ export default function CipyClient({
               {hromadnaChyba && <p className="text-xs text-red-600 mt-0.5">{hromadnaChyba}</p>}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {(['aktivni', 'rezerva', 'ztraceny'] as const).map(stav => (
+              {(['aktivni', 'rezerva', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
                 <button
                   key={stav}
                   type="button"
                   disabled={hromadneUkladani}
                   onClick={() => handleHromadnyStav(stav)}
-                  className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100 transition-colors disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-700 hover:border-zinc-400 hover:bg-zinc-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                 >
                   {STAV_LABELS[stav]}
                 </button>
@@ -746,8 +756,8 @@ export default function CipyClient({
 
                   <div>
                     <label className={LABEL}>Stav čipu</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(['aktivni', 'rezerva', 'ztraceny'] as const).map(stav => (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {(['aktivni', 'rezerva', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
                         <button key={stav} type="button" onClick={() => setForm(p => ({ ...p, stav }))}
                           className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${form.stav === stav ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
                           {STAV_LABELS[stav]}
