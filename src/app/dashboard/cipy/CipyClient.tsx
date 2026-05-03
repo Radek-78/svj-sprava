@@ -258,10 +258,9 @@ export default function CipyClient({
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(c => c.jednotka_id || c.osoba_id || c.externi_prijemce).length
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
-  const volne = evidenceCipy.filter(c => c.jeEvidovany && (c.stav ?? 'aktivni') === 'aktivni' && !c.jednotka_id && !c.osoba_id && !c.externi_prijemce).length
-  const nezadane = evidenceCipy.filter(c => !c.jeEvidovany).length
-  const navrhyVchodu = evidenceCipy.filter(c => getNavrhVchodu(c)).length
-  const bytySCipy = new Set(evidenceCipy.filter(c => c.jednotka_id).map(c => c.jednotka_id)).size
+  const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
+  const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
+  const bezZaznamuBezVchodu = bezZaznamu.length - bezZaznamuSVchodem
 
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
   const canPrev = navIndex > 0
@@ -490,13 +489,12 @@ export default function CipyClient({
       <PageShell
         title="Čipy"
         stats={[
-          { label: 'celkem', value: celkem },
+          { label: 'čipů celkem', value: celkem },
           { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald' },
-          { label: 'rezerv', value: rezervy, dot: 'sky', color: 'sky' },
-          { label: 'volných', value: volne, dot: 'zinc', color: 'zinc' },
-          { label: 'bez záznamu', value: nezadane, dot: 'amber', color: 'amber' },
-          { label: 'návrhů vchodu', value: navrhyVchodu, dot: 'sky', color: 'sky' },
-          { label: 'bytů s čipem', value: bytySCipy, dot: 'sky', color: 'sky' },
+          { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky' },
+          { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber' },
+          { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald' },
+          { label: 'zbývá bez vchodu', value: bezZaznamuBezVchodu, dot: 'zinc', color: 'zinc' },
         ]}
         actions={
           <>
