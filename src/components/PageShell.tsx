@@ -7,6 +7,8 @@ type StatPill = {
   value: number | string
   dot?: 'emerald' | 'amber' | 'sky' | 'zinc'
   color?: 'emerald' | 'amber' | 'sky' | 'zinc'
+  active?: boolean
+  onClick?: () => void
 }
 
 type PageShellProps = {
@@ -44,16 +46,27 @@ export default function PageShell({ title, stats, actions, children }: PageShell
           <div className="flex items-center gap-4 min-w-0">
             <h1 className="text-base font-semibold text-zinc-900 whitespace-nowrap">{title}</h1>
             <div className="flex items-center gap-2">
-              {stats.map((s, i) => (
-                <span
-                  key={i}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${PILL_COLORS[s.color ?? 'zinc']}`}
-                >
-                  {s.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT_COLORS[s.dot]}`} />}
-                  <span className="font-semibold">{s.value}</span>
-                  {s.label}
-                </span>
-              ))}
+              {stats.map((s, i) => {
+                const content = (
+                  <>
+                    {s.dot && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${DOT_COLORS[s.dot]}`} />}
+                    <span className="font-semibold">{s.value}</span>
+                    {s.label}
+                  </>
+                )
+                const className = `inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
+                  s.active ? 'ring-2 ring-violet-500 ring-offset-1' : ''
+                } ${PILL_COLORS[s.color ?? 'zinc']}`
+                return s.onClick ? (
+                  <button key={i} type="button" onClick={s.onClick} className={`${className} hover:ring-2 hover:ring-violet-300 hover:ring-offset-1`}>
+                    {content}
+                  </button>
+                ) : (
+                  <span key={i} className={className}>
+                    {content}
+                  </span>
+                )
+              })}
             </div>
           </div>
           {actions && (

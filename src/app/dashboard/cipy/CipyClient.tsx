@@ -35,6 +35,7 @@ type CipRow = Omit<Cip, 'osoby' | 'jednotky'> & {
 
 type ModalView = 'detail' | 'edit' | 'nova'
 type PrijemceTyp = 'zadny' | 'osoba' | 'externi'
+type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
 
 type FormState = {
   cislo_cipu: string
@@ -210,6 +211,37 @@ function navrhVchoduBadge(navrh: NavrhVchodu | null) {
   )
 }
 
+function jePrideleny(cip: Pick<Cip, 'jednotka_id' | 'osoba_id' | 'externi_prijemce'>) {
+  return Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
+}
+
+function jeNeznamy(cip: EvidenceCip) {
+  return (
+    !jePrideleny(cip) &&
+    cip.stav !== 'rezerva' &&
+    cip.stav !== 'ztraceny' &&
+    !getNavrhVchodu(cip)
+  )
+}
+
+function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
+  switch (filter) {
+    case 'pridelene':
+      return jePrideleny(cip)
+    case 'rezerva':
+      return cip.jeEvidovany && cip.stav === 'rezerva'
+    case 'bez-zaznamu':
+      return !cip.jeEvidovany
+    case 'bez-zaznamu-s-vchodem':
+      return !cip.jeEvidovany && Boolean(getNavrhVchodu(cip))
+    case 'nezname':
+      return jeNeznamy(cip)
+    case 'vse':
+    default:
+      return true
+  }
+}
+
 export default function CipyClient({
   cipy: initialCipy,
   jednotky,
@@ -231,6 +263,7 @@ export default function CipyClient({
   const [vybraneIds, setVybraneIds] = useState<Set<string>>(() => new Set())
   const [hromadneUkladani, setHromadneUkladani] = useState(false)
   const [hromadnaChyba, setHromadnaChyba] = useState('')
+  const [statFilter, setStatFilter] = useState<StatFilter>('vse')
 
   const router = useRouter()
   const supabase = createClient()
@@ -239,9 +272,10 @@ export default function CipyClient({
   const vybrany = evidenceCipy.find(c => c.id === vybranyId) ?? null
 
   const filtrovane = useMemo(() => {
+    const podleStatistiky = evidenceCipy.filter(c => matchesStatFilter(c, statFilter))
     const q = hledani.trim().toLowerCase()
-    if (!q) return evidenceCipy
-    return evidenceCipy.filter(c => {
+    if (!q) return podleStatistiky
+    return podleStatistiky.filter(c => {
       const jednotka = formatJednotka(c.jednotky).toLowerCase()
       return (
         c.cislo_cipu.toLowerCase().includes(q) ||
@@ -253,21 +287,14 @@ export default function CipyClient({
         (c.poznamka ?? '').toLowerCase().includes(q)
       )
     })
-  }, [evidenceCipy, hledani])
+  }, [evidenceCipy, hledani, statFilter])
 
   const celkem = evidenceCipy.length
-  const pridelene = evidenceCipy.filter(c => c.jednotka_id || c.osoba_id || c.externi_prijemce).length
+  const pridelene = evidenceCipy.filter(jePrideleny).length
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
-  const neznameCipy = evidenceCipy.filter(c =>
-    !c.jednotka_id &&
-    !c.osoba_id &&
-    !c.externi_prijemce &&
-    c.stav !== 'rezerva' &&
-    c.stav !== 'ztraceny' &&
-    !getNavrhVchodu(c)
-  ).length
+  const neznameCipy = evidenceCipy.filter(jeNeznamy).length
 
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
   const canPrev = navIndex > 0
@@ -310,6 +337,12 @@ export default function CipyClient({
       else next.add(id)
       return next
     })
+    setHromadnaChyba('')
+  }
+
+  function toggleStatFilter(filter: StatFilter) {
+    setStatFilter(prev => prev === filter ? 'vse' : filter)
+    setVybraneIds(new Set())
     setHromadnaChyba('')
   }
 
@@ -496,12 +529,12 @@ export default function CipyClient({
       <PageShell
         title="Čipy"
         stats={[
-          { label: 'čipů celkem', value: celkem },
-          { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald' },
-          { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky' },
-          { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber' },
-          { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald' },
-          { label: 'neznámých', value: neznameCipy, dot: 'zinc', color: 'zinc' },
+          { label: 'čipů celkem', value: celkem, active: statFilter === 'vse', onClick: () => toggleStatFilter('vse') },
+          { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald', active: statFilter === 'pridelene', onClick: () => toggleStatFilter('pridelene') },
+          { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky', active: statFilter === 'rezerva', onClick: () => toggleStatFilter('rezerva') },
+          { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber', active: statFilter === 'bez-zaznamu', onClick: () => toggleStatFilter('bez-zaznamu') },
+          { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald', active: statFilter === 'bez-zaznamu-s-vchodem', onClick: () => toggleStatFilter('bez-zaznamu-s-vchodem') },
+          { label: 'neznámých', value: neznameCipy, dot: 'zinc', color: 'zinc', active: statFilter === 'nezname', onClick: () => toggleStatFilter('nezname') },
         ]}
         actions={
           <>
@@ -561,7 +594,7 @@ export default function CipyClient({
           </PageThead>
           <PageTbody>
             {filtrovane.length === 0 && (
-              <PageEmpty text={hledani ? 'Žádný čip neodpovídá hledání.' : 'Zatím žádné čipy.'} />
+              <PageEmpty text={hledani || statFilter !== 'vse' ? 'Žádný čip neodpovídá filtru.' : 'Zatím žádné čipy.'} />
             )}
             {filtrovane.map(cip => (
               <PageTr key={cip.id} onClick={() => openDetail(cip.id)}>
