@@ -20,6 +20,11 @@ type Cip = {
   jednotky?: Jednotka | null
 }
 
+type EvidenceCip = Cip & {
+  jeEvidovany: boolean
+  poradoveCislo: number | null
+}
+
 type CipRow = Omit<Cip, 'osoby' | 'jednotky'> & {
   osoby?: Osoba | Osoba[] | null
   jednotky?: Jednotka | Jednotka[] | null
@@ -48,6 +53,7 @@ const EMPTY_FORM: FormState = {
   poznamka: '',
 }
 
+const INVENTARNI_POCET_CIPU = 360
 const INPUT = 'w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white'
 const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 
@@ -61,15 +67,24 @@ function formatJednotka(j: Jednotka | null | undefined) {
   return vchod ? `Byt ${j.cislo_jednotky}, ${vchod}` : `Byt ${j.cislo_jednotky}`
 }
 
-function getPrijemce(cip: Cip) {
+function getPrijemce(cip: Pick<Cip, 'osoby' | 'externi_prijemce'>) {
   if (cip.osoby) return formatJmeno(cip.osoby)
   if (cip.externi_prijemce) return cip.externi_prijemce
   return 'Nepřiděleno'
 }
 
-function numericChipSort(a: Cip, b: Cip) {
-  const an = parseInt(a.cislo_cipu.match(/\d+/)?.[0] ?? '0')
-  const bn = parseInt(b.cislo_cipu.match(/\d+/)?.[0] ?? '0')
+function getCipNumber(cisloCipu: string) {
+  const number = parseInt(cisloCipu.match(/\d+/)?.[0] ?? '', 10)
+  return Number.isFinite(number) ? number : null
+}
+
+function formatCipNumber(number: number) {
+  return String(number).padStart(3, '0')
+}
+
+function numericChipSort(a: Pick<Cip, 'cislo_cipu'>, b: Pick<Cip, 'cislo_cipu'>) {
+  const an = getCipNumber(a.cislo_cipu) ?? Number.MAX_SAFE_INTEGER
+  const bn = getCipNumber(b.cislo_cipu) ?? Number.MAX_SAFE_INTEGER
   return an - bn || a.cislo_cipu.localeCompare(b.cislo_cipu, 'cs')
 }
 
@@ -86,7 +101,46 @@ function normalizeCip(cip: CipRow): Cip {
   }
 }
 
-function statusBadge(cip: Cip) {
+function buildEvidenceCipy(cipy: Cip[]): EvidenceCip[] {
+  const byNumber = new Map<number, Cip>()
+  const extras: Cip[] = []
+
+  for (const cip of [...cipy].sort(numericChipSort)) {
+    const number = getCipNumber(cip.cislo_cipu)
+    if (number && number >= 1 && number <= INVENTARNI_POCET_CIPU && !byNumber.has(number)) {
+      byNumber.set(number, cip)
+    } else {
+      extras.push(cip)
+    }
+  }
+
+  const inventory = Array.from({ length: INVENTARNI_POCET_CIPU }, (_, index) => {
+    const number = index + 1
+    const existing = byNumber.get(number)
+    if (existing) return { ...existing, jeEvidovany: true, poradoveCislo: number }
+    const cisloCipu = formatCipNumber(number)
+    return {
+      id: `inventar-${cisloCipu}`,
+      cislo_cipu: cisloCipu,
+      poznamka: null,
+      osoba_id: null,
+      externi_prijemce: null,
+      datum_predani: null,
+      jednotka_id: null,
+      osoby: null,
+      jednotky: null,
+      jeEvidovany: false,
+      poradoveCislo: number,
+    }
+  })
+
+  return [
+    ...inventory,
+    ...extras.map(cip => ({ ...cip, jeEvidovany: true, poradoveCislo: getCipNumber(cip.cislo_cipu) })),
+  ]
+}
+
+function statusBadge(cip: EvidenceCip) {
   const assigned = Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
   return assigned ? (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
@@ -108,7 +162,7 @@ export default function CipyClient({
   jednotky: Jednotka[]
   osoby: Osoba[]
 }) {
-  const [cipy, setCipy] = useState(initialCipy.map(normalizeCip).sort(numericChipSort))
+  const [ulozeneCipy, setUlozeneCipy] = useState(initialCipy.map(normalizeCip).sort(numericChipSort))
   const [hledani, setHledani] = useState('')
   const [vybranyId, setVybranyId] = useState<string | null>(null)
   const [view, setView] = useState<ModalView>('detail')
@@ -121,26 +175,29 @@ export default function CipyClient({
   const router = useRouter()
   const supabase = createClient()
 
-  const vybrany = cipy.find(c => c.id === vybranyId) ?? null
+  const evidenceCipy = useMemo(() => buildEvidenceCipy(ulozeneCipy), [ulozeneCipy])
+  const vybrany = evidenceCipy.find(c => c.id === vybranyId) ?? null
 
   const filtrovane = useMemo(() => {
     const q = hledani.trim().toLowerCase()
-    if (!q) return cipy
-    return cipy.filter(c => {
+    if (!q) return evidenceCipy
+    return evidenceCipy.filter(c => {
       const jednotka = formatJednotka(c.jednotky).toLowerCase()
       return (
         c.cislo_cipu.toLowerCase().includes(q) ||
         getPrijemce(c).toLowerCase().includes(q) ||
         jednotka.includes(q) ||
+        (c.jeEvidovany ? 'evidovaný' : 'volný sklad nepřiděleno').includes(q) ||
         (c.poznamka ?? '').toLowerCase().includes(q)
       )
     })
-  }, [cipy, hledani])
+  }, [evidenceCipy, hledani])
 
-  const celkem = cipy.length
-  const pridelene = cipy.filter(c => c.jednotka_id || c.osoba_id || c.externi_prijemce).length
+  const celkem = evidenceCipy.length
+  const pridelene = evidenceCipy.filter(c => c.jednotka_id || c.osoba_id || c.externi_prijemce).length
   const volne = celkem - pridelene
-  const bytySCipy = new Set(cipy.filter(c => c.jednotka_id).map(c => c.jednotka_id)).size
+  const nezadane = evidenceCipy.filter(c => !c.jeEvidovany).length
+  const bytySCipy = new Set(evidenceCipy.filter(c => c.jednotka_id).map(c => c.jednotka_id)).size
 
   const navIndex = filtrovane.findIndex(c => c.id === vybranyId)
   const canPrev = navIndex > 0
@@ -155,7 +212,7 @@ export default function CipyClient({
         jednotky(id, cislo_jednotky, vchod, ulice_vchodu)
       `)
       .order('cislo_cipu')
-    if (data) setCipy((data as unknown as CipRow[]).map(normalizeCip).sort(numericChipSort))
+    if (data) setUlozeneCipy((data as unknown as CipRow[]).map(normalizeCip).sort(numericChipSort))
   }, [supabase])
 
   function openDetail(id: string) {
@@ -216,7 +273,8 @@ export default function CipyClient({
     setChyba('')
 
     const payload = payloadFromForm()
-    const { data, error } = view === 'nova'
+    const shouldInsert = view === 'nova' || !vybrany?.jeEvidovany
+    const { data, error } = shouldInsert
       ? await supabase.from('jednotky_cipy').insert(payload).select('id').single()
       : await supabase.from('jednotky_cipy').update(payload).eq('id', vybranyId).select('id').single()
 
@@ -234,7 +292,7 @@ export default function CipyClient({
   }
 
   async function handleDelete() {
-    if (!vybranyId) return
+    if (!vybranyId || !vybrany?.jeEvidovany) return
     setMazani(true)
     setChyba('')
     const { error } = await supabase.from('jednotky_cipy').delete().eq('id', vybranyId)
@@ -265,6 +323,7 @@ export default function CipyClient({
           { label: 'celkem', value: celkem },
           { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald' },
           { label: 'volných', value: volne, dot: 'zinc', color: 'zinc' },
+          { label: 'bez záznamu', value: nezadane, dot: 'amber', color: 'amber' },
           { label: 'bytů s čipem', value: bytySCipy, dot: 'sky', color: 'sky' },
         ]}
         actions={
@@ -308,7 +367,9 @@ export default function CipyClient({
                   {cip.jednotky ? [cip.jednotky.ulice_vchodu, cip.jednotky.vchod].filter(Boolean).join('/') || <span className="text-zinc-300">—</span> : <span className="text-zinc-300">—</span>}
                 </PageTd>
                 <PageTd>{cip.datum_predani ?? <span className="text-zinc-300">—</span>}</PageTd>
-                <PageTd className="max-w-xs truncate">{cip.poznamka ?? <span className="text-zinc-300">—</span>}</PageTd>
+                <PageTd className="max-w-xs truncate">
+                  {cip.poznamka ?? (!cip.jeEvidovany ? <span className="text-zinc-300">bez záznamu</span> : <span className="text-zinc-300">—</span>)}
+                </PageTd>
               </PageTr>
             ))}
           </PageTbody>
@@ -369,13 +430,14 @@ export default function CipyClient({
                     <DetailBox label="Stav">{statusBadge(vybrany)}</DetailBox>
                     <DetailBox label="Přiděleno komu">{getPrijemce(vybrany)}</DetailBox>
                     <DetailBox label="Byt a vchod">{formatJednotka(vybrany.jednotky)}</DetailBox>
+                    <DetailBox label="Evidence">{vybrany.jeEvidovany ? 'Uloženo v evidenci' : 'Zatím bez záznamu'}</DetailBox>
                     <DetailBox label="Datum předání">{vybrany.datum_predani ?? '—'}</DetailBox>
                   </div>
 
                   <div className="mt-5">
                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-2">Poznámka</p>
                     <div className="min-h-16 rounded-xl border border-zinc-100 bg-zinc-50 px-4 py-3 text-sm text-zinc-600">
-                      {vybrany.poznamka ?? <span className="text-zinc-300">—</span>}
+                      {vybrany.poznamka ?? <span className="text-zinc-300">{vybrany.jeEvidovany ? '—' : 'Čip je v základním inventáři 001-360, ale zatím nemá uložené přiřazení ani poznámku.'}</span>}
                     </div>
                   </div>
 
@@ -384,9 +446,9 @@ export default function CipyClient({
                   <div className="mt-6 flex gap-2">
                     <button onClick={openEdit}
                       className="flex-1 border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 transition-colors font-medium">
-                      Upravit čip
+                      {vybrany.jeEvidovany ? 'Upravit čip' : 'Zaevidovat čip'}
                     </button>
-                    {potvrzeni ? (
+                    {vybrany.jeEvidovany && (potvrzeni ? (
                       <>
                         <button onClick={handleDelete} disabled={mazani}
                           className="flex-1 bg-red-600 text-white text-sm py-2.5 rounded-xl hover:bg-red-700 transition-colors font-medium disabled:opacity-50">
@@ -402,7 +464,7 @@ export default function CipyClient({
                         className="flex-1 border border-red-200 text-red-500 text-sm py-2.5 rounded-xl hover:bg-red-50 transition-colors font-medium">
                         Smazat čip
                       </button>
-                    )}
+                    ))}
                   </div>
                 </div>
               )}
