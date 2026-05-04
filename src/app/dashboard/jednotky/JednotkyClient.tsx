@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
@@ -48,6 +48,8 @@ type Jednotka = {
 }
 
 type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici' | 'add-cip' | 'add-osoba'
+type SortDirection = 'asc' | 'desc'
+type JednotkaSortKey = 'cislo' | 'vchod' | 'patro' | 'plocha' | 'podil' | 'vlastnik' | 'najemnik' | 'bydlici' | 'stav'
 
 type EditForm = {
   cislo_jednotky: string
@@ -69,16 +71,6 @@ function formatJmeno(o: OsobaMinimal) {
   return [o.prijmeni, o.jmeno].filter(Boolean).join(' ')
 }
 
-function typVlastnictviLabel(typ: string | null) {
-  const map: Record<string, string> = {
-    individualni: 'Individuální',
-    podilove: 'Podílové',
-    sjm: 'SJM',
-    mcp: 'Manželé cizího práva',
-  }
-  return typ ? (map[typ] ?? typ) : ''
-}
-
 function typVlastnictviBadge(typ: string | null) {
   if (!typ || typ === 'individualni') return null
   const colors: Record<string, string> = {
@@ -91,6 +83,10 @@ function typVlastnictviBadge(typ: string | null) {
       {typ.toUpperCase()}
     </span>
   )
+}
+
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
 }
 
 function KontaktWarnings({ vlastnici }: { vlastnici: Vazba[] }) {
@@ -134,6 +130,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [potvrzeni, setPotvrzeni] = useState(false)
   const [ukladani, setUkladani] = useState(false)
   const [chyba, setChyba] = useState('')
+  const [sortKey, setSortKey] = useState<JednotkaSortKey>('cislo')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const [hledani, setHledani] = useState('')
   const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'cipy'>('vlastnictvi')
@@ -488,7 +486,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
 
   // ─── Filtrování ──────────────────────────────────────────────────────────────
 
-  const filtrovane = jednotky.filter(j => {
+  const filtrovane = useMemo(() => {
+    const filtered = jednotky.filter(j => {
     if (!hledani) return true
     const q = hledani.toLowerCase()
     const vlastnici = j.jednotky_osoby
@@ -506,12 +505,46 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       (najemnik ? formatJmeno(najemnik.osoby).toLowerCase().includes(q) : false)
     )
   })
+    const sorted = [...filtered].sort((a, b) => {
+      const vlastnikA = a.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni).map(v => formatJmeno(v.osoby)).join(', ')
+      const vlastnikB = b.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni).map(v => formatJmeno(v.osoby)).join(', ')
+      const najemnikA = a.jednotky_osoby.filter(v => v.role === 'najemnik' && v.je_aktivni).map(v => formatJmeno(v.osoby)).join(', ')
+      const najemnikB = b.jednotky_osoby.filter(v => v.role === 'najemnik' && v.je_aktivni).map(v => formatJmeno(v.osoby)).join(', ')
+      const stavA = a.jednotky_osoby.some(v => v.role === 'najemnik' && v.je_aktivni) ? '2-pronajato' : a.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni) ? '1-obsazeno' : a.pravdepodobny_pronajem ? '3-ocekavano' : '4-volne'
+      const stavB = b.jednotky_osoby.some(v => v.role === 'najemnik' && v.je_aktivni) ? '2-pronajato' : b.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni) ? '1-obsazeno' : b.pravdepodobny_pronajem ? '3-ocekavano' : '4-volne'
+      let result = 0
+      if (sortKey === 'cislo') result = compareText(a.cislo_jednotky, b.cislo_jednotky)
+      if (sortKey === 'vchod') result = compareText(a.vchod ?? '', b.vchod ?? '')
+      if (sortKey === 'patro') result = (a.patro ?? -999) - (b.patro ?? -999)
+      if (sortKey === 'plocha') result = (a.uzitna_plocha ?? 0) - (b.uzitna_plocha ?? 0)
+      if (sortKey === 'podil') result = (a.podil_citatel ?? 0) / (a.podil_jmenovatel || 1) - (b.podil_citatel ?? 0) / (b.podil_jmenovatel || 1)
+      if (sortKey === 'vlastnik') result = compareText(vlastnikA, vlastnikB)
+      if (sortKey === 'najemnik') result = compareText(najemnikA, najemnikB)
+      if (sortKey === 'bydlici') result = a.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length - b.jednotky_osoby.filter(v => v.role === 'bydlici' && v.je_aktivni).length
+      if (sortKey === 'stav') result = compareText(stavA, stavB)
+      return sortDirection === 'asc' ? result : -result
+    })
+    return sorted
+  }, [hledani, jednotky, sortDirection, sortKey])
 
   const navIndex = filtrovane.findIndex(j => j.id === vybranaId)
   const canPrev = navIndex > 0
   const canNext = navIndex < filtrovane.length - 1
   function goPrev() { if (canPrev) openModal(filtrovane[navIndex - 1].id) }
   function goNext() { if (canNext) openModal(filtrovane[navIndex + 1].id) }
+
+  function toggleSort(key: JednotkaSortKey) {
+    if (sortKey === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  function sortFor(key: JednotkaSortKey) {
+    return sortKey === key ? sortDirection : null
+  }
 
   // ─── Render tabulky ──────────────────────────────────────────────────────────
 
@@ -571,15 +604,15 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     >
       <PageTable>
         <PageThead>
-          <PageTh>Číslo</PageTh>
-          <PageTh>Vchod</PageTh>
-          <PageTh>Patro</PageTh>
-          <PageTh>Plocha</PageTh>
-          <PageTh>Podíl</PageTh>
-          <PageTh>Vlastník</PageTh>
-          <PageTh>Nájemník</PageTh>
-          <PageTh center>Hlášeni</PageTh>
-          <PageTh>Stav</PageTh>
+          <PageTh sortDirection={sortFor('cislo')} onSort={() => toggleSort('cislo')}>Číslo</PageTh>
+          <PageTh sortDirection={sortFor('vchod')} onSort={() => toggleSort('vchod')}>Vchod</PageTh>
+          <PageTh sortDirection={sortFor('patro')} onSort={() => toggleSort('patro')}>Patro</PageTh>
+          <PageTh sortDirection={sortFor('plocha')} onSort={() => toggleSort('plocha')}>Plocha</PageTh>
+          <PageTh sortDirection={sortFor('podil')} onSort={() => toggleSort('podil')}>Podíl</PageTh>
+          <PageTh sortDirection={sortFor('vlastnik')} onSort={() => toggleSort('vlastnik')}>Vlastník</PageTh>
+          <PageTh sortDirection={sortFor('najemnik')} onSort={() => toggleSort('najemnik')}>Nájemník</PageTh>
+          <PageTh center sortDirection={sortFor('bydlici')} onSort={() => toggleSort('bydlici')}>Hlášeni</PageTh>
+          <PageTh sortDirection={sortFor('stav')} onSort={() => toggleSort('stav')}>Stav</PageTh>
           <PageTh center> </PageTh>
         </PageThead>
         <PageTbody>

@@ -18,6 +18,8 @@ type PageShellProps = {
   children: React.ReactNode
 }
 
+type SortDirection = 'asc' | 'desc'
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const DOT_COLORS = {
@@ -42,13 +44,13 @@ export default function PageShell({ title, stats, actions, children }: PageShell
 
       {/* Hlavička — pevná výška 56px, identická u všech záložek */}
       <div className="bg-white/[0.92] border-b border-zinc-200/80 px-6 flex-shrink-0 shadow-[0_1px_0_rgba(255,255,255,0.9),0_12px_28px_rgba(15,23,42,0.05)]" style={{ height: 64 }}>
-        <div className="h-full flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4 min-w-0">
-            <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="h-full flex items-center justify-between gap-5">
+          <div className="flex items-center gap-6 min-w-0">
+            <div className="flex items-center gap-3 flex-shrink-0 pr-2">
               <span className="h-8 w-1 rounded-full bg-emerald-500" />
               <h1 className="text-base font-black text-zinc-950 whitespace-nowrap tracking-tight">{title}</h1>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto py-2">
+            <div className="flex items-center gap-2 overflow-x-auto py-2 pl-1">
               {stats.map((s, i) => {
                 const content = (
                   <>
@@ -107,10 +109,49 @@ export function PageThead({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function PageTh({ children, center }: { children: React.ReactNode; center?: boolean }) {
+export function PageTh({
+  children,
+  center,
+  sortDirection,
+  onSort,
+}: {
+  children: React.ReactNode
+  center?: boolean
+  sortDirection?: SortDirection | null
+  onSort?: () => void
+}) {
+  const content = (
+    <span className={`inline-flex items-center gap-1.5 ${center ? 'justify-center' : ''}`}>
+      <span>{children}</span>
+      {onSort && (
+        <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full transition-colors ${
+          sortDirection ? 'bg-emerald-100 text-emerald-700' : 'bg-zinc-200/70 text-zinc-400'
+        }`}>
+          <svg
+            className={`h-2.5 w-2.5 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 15l6-6 6 6" />
+          </svg>
+        </span>
+      )}
+    </span>
+  )
+
   return (
     <th className={`${center ? 'text-center' : 'text-left'} px-4 py-3 text-[11px] font-black text-zinc-500 uppercase tracking-[0.08em] first:pl-6`}>
-      {children}
+      {onSort ? (
+        <button
+          type="button"
+          onClick={onSort}
+          className={`group -mx-2 inline-flex rounded-lg px-2 py-1 transition-colors hover:bg-white hover:text-zinc-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/60 ${center ? 'justify-center' : ''}`}
+        >
+          {content}
+        </button>
+      ) : content}
     </th>
   )
 }

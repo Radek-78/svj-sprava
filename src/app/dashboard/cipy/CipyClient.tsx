@@ -32,6 +32,8 @@ type CipRow = Omit<Cip, 'jednotky'> & {
 
 type ModalView = 'detail' | 'edit' | 'nova'
 type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'dlouhodobe-nepouzite' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
+type SortDirection = 'asc' | 'desc'
+type CipSortKey = 'cislo' | 'stav' | 'byt' | 'vchod' | 'navrh' | 'datum' | 'poznamka'
 
 type FormState = {
   cislo_cipu: string
@@ -232,6 +234,10 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
   }
 }
 
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
+}
+
 export default function CipyClient({
   cipy: initialCipy,
   jednotky,
@@ -252,6 +258,8 @@ export default function CipyClient({
   const [hromadneUkladani, setHromadneUkladani] = useState(false)
   const [hromadnaChyba, setHromadnaChyba] = useState('')
   const [statFilter, setStatFilter] = useState<StatFilter>('vse')
+  const [sortKey, setSortKey] = useState<CipSortKey>('cislo')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const router = useRouter()
   const supabase = createClient()
@@ -262,8 +270,7 @@ export default function CipyClient({
   const filtrovane = useMemo(() => {
     const podleStatistiky = evidenceCipy.filter(c => matchesStatFilter(c, statFilter))
     const q = hledani.trim().toLowerCase()
-    if (!q) return podleStatistiky
-    return podleStatistiky.filter(c => {
+    const podleHledani = !q ? podleStatistiky : podleStatistiky.filter(c => {
       const jednotka = formatJednotka(c.jednotky).toLowerCase()
       return (
         c.cislo_cipu.toLowerCase().includes(q) ||
@@ -274,7 +281,19 @@ export default function CipyClient({
         (c.poznamka ?? '').toLowerCase().includes(q)
       )
     })
-  }, [evidenceCipy, hledani, statFilter])
+    const sorted = [...podleHledani].sort((a, b) => {
+      let result = 0
+      if (sortKey === 'cislo') result = (getCipNumber(a.cislo_cipu) ?? 0) - (getCipNumber(b.cislo_cipu) ?? 0)
+      if (sortKey === 'stav') result = compareText(a.stav ? STAV_LABELS[a.stav] : 'Bez záznamu', b.stav ? STAV_LABELS[b.stav] : 'Bez záznamu')
+      if (sortKey === 'byt') result = compareText(a.jednotky?.cislo_jednotky ?? '', b.jednotky?.cislo_jednotky ?? '')
+      if (sortKey === 'vchod') result = compareText(a.jednotky?.vchod ?? '', b.jednotky?.vchod ?? '')
+      if (sortKey === 'navrh') result = compareText(getNavrhVchodu(a)?.vchod ?? '', getNavrhVchodu(b)?.vchod ?? '')
+      if (sortKey === 'datum') result = compareText(a.datum_predani ?? '', b.datum_predani ?? '')
+      if (sortKey === 'poznamka') result = compareText(a.poznamka ?? '', b.poznamka ?? '')
+      return sortDirection === 'asc' ? result : -result
+    })
+    return sorted
+  }, [evidenceCipy, hledani, statFilter, sortDirection, sortKey])
 
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(jePrideleny).length
@@ -331,6 +350,19 @@ export default function CipyClient({
     setStatFilter(prev => prev === filter ? 'vse' : filter)
     setVybraneIds(new Set())
     setHromadnaChyba('')
+  }
+
+  function toggleSort(key: CipSortKey) {
+    if (sortKey === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  function sortFor(key: CipSortKey) {
+    return sortKey === key ? sortDirection : null
   }
 
   function toggleVybraneFiltrovane() {
@@ -568,13 +600,13 @@ export default function CipyClient({
                 title={allFilteredSelected ? 'Zrušit výběr zobrazených čipů' : 'Vybrat zobrazené čipy'}
               />
             </PageTh>
-            <PageTh>Čip</PageTh>
-            <PageTh>Stav</PageTh>
-            <PageTh>Byt</PageTh>
-            <PageTh>Vchod</PageTh>
-            <PageTh>Návrh vchodu</PageTh>
-            <PageTh>Datum přiřazení</PageTh>
-            <PageTh>Poznámka</PageTh>
+            <PageTh sortDirection={sortFor('cislo')} onSort={() => toggleSort('cislo')}>Čip</PageTh>
+            <PageTh sortDirection={sortFor('stav')} onSort={() => toggleSort('stav')}>Stav</PageTh>
+            <PageTh sortDirection={sortFor('byt')} onSort={() => toggleSort('byt')}>Byt</PageTh>
+            <PageTh sortDirection={sortFor('vchod')} onSort={() => toggleSort('vchod')}>Vchod</PageTh>
+            <PageTh sortDirection={sortFor('navrh')} onSort={() => toggleSort('navrh')}>Návrh vchodu</PageTh>
+            <PageTh sortDirection={sortFor('datum')} onSort={() => toggleSort('datum')}>Datum přiřazení</PageTh>
+            <PageTh sortDirection={sortFor('poznamka')} onSort={() => toggleSort('poznamka')}>Poznámka</PageTh>
           </PageThead>
           <PageTbody>
             {filtrovane.length === 0 && (

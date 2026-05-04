@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
@@ -40,6 +40,8 @@ type Osoba = {
 }
 
 type ModalView = 'detail' | 'edit' | 'nova'
+type SortDirection = 'asc' | 'desc'
+type OsobaSortKey = 'jmeno' | 'email' | 'telefon' | 'adresa' | 'jednotky'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -78,11 +80,17 @@ function typVlastnictviBadge(typ: string | null) {
   )
 }
 
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
+}
+
 // ─── Hlavní komponenta ────────────────────────────────────────────────────────
 
 export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]; openId?: string }) {
   const [osoby, setOsoby] = useState(initial)
-  const [vybranaId, setVybranaId] = useState<string | null>(null)
+  const [vybranaId, setVybranaId] = useState<string | null>(() => (
+    openId && initial.some(o => o.id === openId) ? openId : null
+  ))
   const [view, setView] = useState<ModalView>('detail')
   const [mazani, setMazani] = useState(false)
   const [potvrzeni, setPotvrzeni] = useState(false)
@@ -90,20 +98,22 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
   const [chyba, setChyba] = useState('')
   const [hledani, setHledani] = useState('')
   const [editForm, setEditForm] = useState<EditForm>(EMPTY_FORM)
+  const [sortKey, setSortKey] = useState<OsobaSortKey>('jmeno')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const router = useRouter()
   const supabase = createClient()
 
   useEffect(() => {
-    if (openId && osoby.some(o => o.id === openId)) {
-      openModal(openId)
+    if (openId) {
       router.replace('/dashboard/osoby')
     }
-  }, [openId])
+  }, [openId, router])
 
   const vybrana = osoby.find(o => o.id === vybranaId) ?? null
 
-  const filtrovane = osoby.filter(o => {
+  const filtrovane = useMemo(() => {
+    const filtered = osoby.filter(o => {
     if (!hledani) return true
     const q = hledani.toLowerCase()
     const jednotkyCisla = o.jednotky_osoby.map(v => v.jednotky.cislo_jednotky).join(' ')
@@ -119,12 +129,40 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
       jednotkyCisla.includes(q)
     )
   })
+    const sorted = [...filtered].sort((a, b) => {
+      const adresaA = [a.kontaktni_ulice, a.kontaktni_mesto].filter(Boolean).join(', ')
+      const adresaB = [b.kontaktni_ulice, b.kontaktni_mesto].filter(Boolean).join(', ')
+      const jednotkyA = a.jednotky_osoby.filter(v => v.je_aktivni).map(v => v.jednotky.cislo_jednotky).join(', ')
+      const jednotkyB = b.jednotky_osoby.filter(v => v.je_aktivni).map(v => v.jednotky.cislo_jednotky).join(', ')
+      let result = 0
+      if (sortKey === 'jmeno') result = compareText(formatJmeno(a), formatJmeno(b))
+      if (sortKey === 'email') result = compareText(a.email ?? '', b.email ?? '')
+      if (sortKey === 'telefon') result = compareText(a.telefon ?? '', b.telefon ?? '')
+      if (sortKey === 'adresa') result = compareText(adresaA, adresaB)
+      if (sortKey === 'jednotky') result = compareText(jednotkyA, jednotkyB)
+      return sortDirection === 'asc' ? result : -result
+    })
+    return sorted
+  }, [hledani, osoby, sortDirection, sortKey])
 
   const navIndex = filtrovane.findIndex(o => o.id === vybranaId)
   const canPrev = navIndex > 0
   const canNext = navIndex < filtrovane.length - 1
   function goPrev() { if (canPrev) openModal(filtrovane[navIndex - 1].id) }
   function goNext() { if (canNext) openModal(filtrovane[navIndex + 1].id) }
+
+  function toggleSort(key: OsobaSortKey) {
+    if (sortKey === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  function sortFor(key: OsobaSortKey) {
+    return sortKey === key ? sortDirection : null
+  }
 
   const celkem = osoby.length
   const vlastnici = new Set(osoby.filter(o => o.jednotky_osoby.some(v => v.role === 'vlastnik' && v.je_aktivni)).map(o => o.id)).size
@@ -223,11 +261,11 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
       >
         <PageTable>
           <PageThead>
-            <PageTh>Jméno</PageTh>
-            <PageTh>E-mail</PageTh>
-            <PageTh>Telefon</PageTh>
-            <PageTh>Adresa</PageTh>
-            <PageTh>Jednotky</PageTh>
+            <PageTh sortDirection={sortFor('jmeno')} onSort={() => toggleSort('jmeno')}>Jméno</PageTh>
+            <PageTh sortDirection={sortFor('email')} onSort={() => toggleSort('email')}>E-mail</PageTh>
+            <PageTh sortDirection={sortFor('telefon')} onSort={() => toggleSort('telefon')}>Telefon</PageTh>
+            <PageTh sortDirection={sortFor('adresa')} onSort={() => toggleSort('adresa')}>Adresa</PageTh>
+            <PageTh sortDirection={sortFor('jednotky')} onSort={() => toggleSort('jednotky')}>Jednotky</PageTh>
           </PageThead>
           <PageTbody>
             {filtrovane.length === 0 && (
