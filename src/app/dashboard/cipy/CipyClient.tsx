@@ -82,6 +82,15 @@ function numericChipSort(a: Pick<Cip, 'cislo_cipu'>, b: Pick<Cip, 'cislo_cipu'>)
   return an - bn || a.cislo_cipu.localeCompare(b.cislo_cipu, 'cs')
 }
 
+function cipEvidencePriority(cip: Cip) {
+  if (cip.jednotka_id) return 5
+  if (cip.stav === 'aktivni') return 4
+  if (cip.stav === 'rezerva') return 3
+  if (cip.stav === 'dlouhodobe_nepouzit') return 2
+  if (cip.stav === 'ztraceny') return 1
+  return 0
+}
+
 function relationOne<T>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null
   return value ?? null
@@ -100,8 +109,11 @@ function buildEvidenceCipy(cipy: Cip[]): EvidenceCip[] {
 
   for (const cip of [...cipy].sort(numericChipSort)) {
     const number = getCipNumber(cip.cislo_cipu)
-    if (number && number >= 1 && number <= INVENTARNI_POCET_CIPU && !byNumber.has(number)) {
-      byNumber.set(number, cip)
+    if (number && number >= 1 && number <= INVENTARNI_POCET_CIPU) {
+      const existing = byNumber.get(number)
+      if (!existing || cipEvidencePriority(cip) > cipEvidencePriority(existing)) {
+        byNumber.set(number, cip)
+      }
     } else {
       extras.push(cip)
     }
@@ -142,18 +154,19 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
-  if (cip.stav === 'rezerva') {
+  const assigned = Boolean(cip.jednotka_id)
+  if (assigned) {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 ring-1 ring-sky-200 text-xs font-semibold">
-        Rezerva
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
+        Přidělený
       </span>
     )
   }
 
-  if (cip.stav === 'ztraceny') {
+  if (cip.stav === 'rezerva') {
     return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-50 text-red-700 ring-1 ring-red-200 text-xs font-semibold">
-        Blokovaný
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 ring-1 ring-sky-200 text-xs font-semibold">
+        Rezerva
       </span>
     )
   }
@@ -166,12 +179,15 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
-  const assigned = Boolean(cip.jednotka_id)
-  return assigned ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
-      Přidělený
-    </span>
-  ) : (
+  if (cip.stav === 'ztraceny') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-50 text-red-700 ring-1 ring-red-200 text-xs font-semibold">
+        Blokovaný
+      </span>
+    )
+  }
+
+  return (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 text-xs font-semibold">
       Volný
     </span>
@@ -219,9 +235,9 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
     case 'pridelene':
       return jePrideleny(cip)
     case 'rezerva':
-      return cip.jeEvidovany && cip.stav === 'rezerva'
+      return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'rezerva'
     case 'dlouhodobe-nepouzite':
-      return cip.jeEvidovany && cip.stav === 'dlouhodobe_nepouzit'
+      return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'dlouhodobe_nepouzit'
     case 'bez-zaznamu':
       return !cip.jeEvidovany
     case 'bez-zaznamu-s-vchodem':
@@ -297,8 +313,8 @@ export default function CipyClient({
 
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(jePrideleny).length
-  const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
-  const dlouhodobeNepouzite = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'dlouhodobe_nepouzit').length
+  const rezervy = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'rezerva').length
+  const dlouhodobeNepouzite = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'dlouhodobe_nepouzit').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
   const neznameCipy = evidenceCipy.filter(jeNeznamy).length

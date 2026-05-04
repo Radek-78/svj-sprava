@@ -89,6 +89,33 @@ function compareText(a: string, b: string) {
   return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
 }
 
+function getCipNumber(cisloCipu: string) {
+  const number = parseInt(cisloCipu.match(/\d+/)?.[0] ?? '', 10)
+  return Number.isFinite(number) ? number : null
+}
+
+function normalizeCisloCipu(cisloCipu: string) {
+  const trimmed = cisloCipu.trim()
+  const number = getCipNumber(trimmed)
+  return number && number >= 1 && number <= 360 ? String(number).padStart(3, '0') : trimmed
+}
+
+function cipPriority(cip: Cip) {
+  return (cip.datum_predani ? 2 : 0) + (cip.poznamka ? 1 : 0)
+}
+
+function dedupeCipy(cipy: Cip[]) {
+  const byNumber = new Map<string, Cip>()
+  for (const cip of cipy) {
+    const key = String(getCipNumber(cip.cislo_cipu) ?? cip.cislo_cipu)
+    const existing = byNumber.get(key)
+    if (!existing || cipPriority(cip) >= cipPriority(existing)) {
+      byNumber.set(key, cip)
+    }
+  }
+  return [...byNumber.values()]
+}
+
 function KontaktWarnings({ vlastnici }: { vlastnici: Vazba[] }) {
   if (vlastnici.length === 0) return null
   const missingPhone = vlastnici.some(v => !v.osoby.telefon)
@@ -419,15 +446,32 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
     e.preventDefault()
     if (!vybranaId || !acCislo) return
     setUkladani(true); setChyba('')
-    const { error } = await supabase.from('jednotky_cipy').insert({
-      jednotka_id: vybranaId, 
-      cislo_cipu: acCislo, 
+    const cisloCipu = normalizeCisloCipu(acCislo)
+    const mozneVarianty = [...new Set([acCislo.trim(), cisloCipu])]
+    const payload = {
+      jednotka_id: vybranaId,
+      stav: 'aktivni',
       poznamka: acPoznamka || null,
       osoba_id: null,
       externi_prijemce: null,
       datum_predani: acDatum || null,
-    })
-    if (error) { setChyba(error.message); setUkladani(false); return }
+    }
+
+    const update = await supabase
+      .from('jednotky_cipy')
+      .update(payload, { count: 'exact' })
+      .in('cislo_cipu', mozneVarianty)
+
+    if (update.error) { setChyba(update.error.message); setUkladani(false); return }
+
+    if ((update.count ?? 0) === 0) {
+      const { error } = await supabase.from('jednotky_cipy').insert({
+        ...payload,
+        cislo_cipu: cisloCipu,
+      })
+      if (error) { setChyba(error.message); setUkladani(false); return }
+    }
+
     await refreshJednotky()
     router.refresh()
     setView('detail')
@@ -968,7 +1012,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                             <button onClick={openAddCip} className="text-[10px] bg-zinc-900 text-white hover:bg-zinc-700 font-bold px-2.5 py-1 rounded-lg transition-colors">+ Přidat</button>
                           </div>
                           {(() => {
-                            const serazeneCipy = [...(vybrana.jednotky_cipy || [])].sort((a, b) => {
+                            const serazeneCipy = dedupeCipy(vybrana.jednotky_cipy || []).sort((a, b) => {
                               const an = parseInt(a.cislo_cipu.match(/\d+/)?.[0] || '0')
                               const bn = parseInt(b.cislo_cipu.match(/\d+/)?.[0] || '0')
                               return an - bn || a.cislo_cipu.localeCompare(b.cislo_cipu)
