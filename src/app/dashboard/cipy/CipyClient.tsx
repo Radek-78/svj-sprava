@@ -84,10 +84,10 @@ function numericChipSort(a: Pick<Cip, 'cislo_cipu'>, b: Pick<Cip, 'cislo_cipu'>)
 }
 
 function cipEvidencePriority(cip: Cip) {
+  if (cip.stav === 'spravce_vsechny_vchody') return 6
   if (cip.jednotka_id) return 5
   if (cip.stav === 'aktivni') return 4
   if (cip.stav === 'rezerva') return 3
-  if (cip.stav === 'spravce_vsechny_vchody') return 3
   if (cip.stav === 'dlouhodobe_nepouzit') return 2
   if (cip.stav === 'ztraceny') return 1
   return 0
@@ -156,6 +156,14 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
+  if (cip.stav === 'spravce_vsechny_vchody') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-xs font-semibold">
+        Správce
+      </span>
+    )
+  }
+
   const assigned = Boolean(cip.jednotka_id)
   if (assigned) {
     return (
@@ -169,14 +177,6 @@ function statusBadge(cip: EvidenceCip) {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-sky-50 text-sky-700 ring-1 ring-sky-200 text-xs font-semibold">
         Rezerva
-      </span>
-    )
-  }
-
-  if (cip.stav === 'spravce_vsechny_vchody') {
-    return (
-      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-xs font-semibold">
-        Správce
       </span>
     )
   }
@@ -248,7 +248,7 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
     case 'rezerva':
       return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'rezerva'
     case 'spravce':
-      return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'spravce_vsechny_vchody'
+      return cip.jeEvidovany && cip.stav === 'spravce_vsechny_vchody'
     case 'dlouhodobe-nepouzite':
       return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'dlouhodobe_nepouzit'
     case 'bez-zaznamu':
@@ -327,7 +327,7 @@ export default function CipyClient({
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(jePrideleny).length
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'rezerva').length
-  const spravcovske = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'spravce_vsechny_vchody').length
+  const spravcovske = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'spravce_vsechny_vchody').length
   const dlouhodobeNepouzite = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'dlouhodobe_nepouzit').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
