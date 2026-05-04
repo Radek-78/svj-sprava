@@ -7,7 +7,7 @@ import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, 
 import { NAVRHY_VCHODU, type NavrhVchodu } from './navrhyVchodu'
 
 type Jednotka = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
-type CipStav = 'aktivni' | 'rezerva' | 'dlouhodobe_nepouzit' | 'ztraceny'
+type CipStav = 'aktivni' | 'rezerva' | 'spravce_vsechny_vchody' | 'dlouhodobe_nepouzit' | 'ztraceny'
 
 type Cip = {
   id: string
@@ -31,7 +31,7 @@ type CipRow = Omit<Cip, 'jednotky'> & {
 }
 
 type ModalView = 'detail' | 'edit' | 'nova'
-type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'dlouhodobe-nepouzite' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
+type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'spravce' | 'dlouhodobe-nepouzite' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
 type SortDirection = 'asc' | 'desc'
 type CipSortKey = 'cislo' | 'stav' | 'byt' | 'vchod' | 'navrh' | 'datum' | 'poznamka'
 
@@ -58,6 +58,7 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 const STAV_LABELS: Record<CipStav, string> = {
   aktivni: 'Běžný',
   rezerva: 'Rezerva u správce',
+  spravce_vsechny_vchody: 'Správce / všechny vchody',
   dlouhodobe_nepouzit: 'Dlouhodobě nepoužit',
   ztraceny: 'Ztracený / blokovaný',
 }
@@ -86,6 +87,7 @@ function cipEvidencePriority(cip: Cip) {
   if (cip.jednotka_id) return 5
   if (cip.stav === 'aktivni') return 4
   if (cip.stav === 'rezerva') return 3
+  if (cip.stav === 'spravce_vsechny_vchody') return 3
   if (cip.stav === 'dlouhodobe_nepouzit') return 2
   if (cip.stav === 'ztraceny') return 1
   return 0
@@ -171,6 +173,14 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
+  if (cip.stav === 'spravce_vsechny_vchody') {
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-violet-50 text-violet-700 ring-1 ring-violet-200 text-xs font-semibold">
+        Správce
+      </span>
+    )
+  }
+
   if (cip.stav === 'dlouhodobe_nepouzit') {
     return (
       <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-700 ring-1 ring-zinc-300 text-xs font-semibold">
@@ -224,6 +234,7 @@ function jeNeznamy(cip: EvidenceCip) {
   return (
     !jePrideleny(cip) &&
     cip.stav !== 'rezerva' &&
+    cip.stav !== 'spravce_vsechny_vchody' &&
     cip.stav !== 'dlouhodobe_nepouzit' &&
     cip.stav !== 'ztraceny' &&
     !getNavrhVchodu(cip)
@@ -236,6 +247,8 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
       return jePrideleny(cip)
     case 'rezerva':
       return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'rezerva'
+    case 'spravce':
+      return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'spravce_vsechny_vchody'
     case 'dlouhodobe-nepouzite':
       return cip.jeEvidovany && !jePrideleny(cip) && cip.stav === 'dlouhodobe_nepouzit'
     case 'bez-zaznamu':
@@ -314,6 +327,7 @@ export default function CipyClient({
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(jePrideleny).length
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'rezerva').length
+  const spravcovske = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'spravce_vsechny_vchody').length
   const dlouhodobeNepouzite = evidenceCipy.filter(c => c.jeEvidovany && !jePrideleny(c) && c.stav === 'dlouhodobe_nepouzit').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
@@ -564,6 +578,7 @@ export default function CipyClient({
           { label: 'čipů celkem', value: celkem, active: statFilter === 'vse', onClick: () => toggleStatFilter('vse') },
           { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald', active: statFilter === 'pridelene', onClick: () => toggleStatFilter('pridelene') },
           { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky', active: statFilter === 'rezerva', onClick: () => toggleStatFilter('rezerva') },
+          { label: 'správce / všechny vchody', value: spravcovske, dot: 'zinc', color: 'zinc', active: statFilter === 'spravce', onClick: () => toggleStatFilter('spravce') },
           { label: 'dlouhodobě nepoužitých', value: dlouhodobeNepouzite, dot: 'zinc', color: 'zinc', active: statFilter === 'dlouhodobe-nepouzite', onClick: () => toggleStatFilter('dlouhodobe-nepouzite') },
           { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber', active: statFilter === 'bez-zaznamu', onClick: () => toggleStatFilter('bez-zaznamu') },
           { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald', active: statFilter === 'bez-zaznamu-s-vchodem', onClick: () => toggleStatFilter('bez-zaznamu-s-vchodem') },
@@ -583,7 +598,7 @@ export default function CipyClient({
               {hromadnaChyba && <p className="text-xs text-red-600 mt-0.5">{hromadnaChyba}</p>}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {(['aktivni', 'rezerva', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
+              {(['aktivni', 'rezerva', 'spravce_vsechny_vchody', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
                 <button
                   key={stav}
                   type="button"
@@ -723,6 +738,9 @@ export default function CipyClient({
                     <DetailBox label="Vchod">{vybrany.jednotky?.vchod ?? '—'}</DetailBox>
                     <DetailBox label="Návrh vchodu">{navrhVchoduBadge(getNavrhVchodu(vybrany))}</DetailBox>
                     <DetailBox label="Typ stavu">{vybrany.stav ? STAV_LABELS[vybrany.stav] : '—'}</DetailBox>
+                    {vybrany.stav === 'spravce_vsechny_vchody' && (
+                      <DetailBox label="Přístup">Všechny vchody</DetailBox>
+                    )}
                     <DetailBox label="Evidence">{vybrany.jeEvidovany ? 'Uloženo v evidenci' : 'Zatím bez záznamu'}</DetailBox>
                     <DetailBox label="Datum přiřazení">{vybrany.datum_predani ?? '—'}</DetailBox>
                   </div>
@@ -777,10 +795,10 @@ export default function CipyClient({
 
                   <div>
                     <label className={LABEL}>Stav čipu</label>
-                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {(['aktivni', 'rezerva', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                      {(['aktivni', 'rezerva', 'spravce_vsechny_vchody', 'dlouhodobe_nepouzit', 'ztraceny'] as const).map(stav => (
                         <button key={stav} type="button" onClick={() => setForm(p => ({ ...p, stav }))}
-                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${form.stav === stav ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
+                          className={`min-h-10 px-2 py-2 rounded-lg text-[11px] font-semibold border leading-tight transition-colors ${form.stav === stav ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
                           {STAV_LABELS[stav]}
                         </button>
                       ))}
