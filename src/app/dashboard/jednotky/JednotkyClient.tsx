@@ -14,10 +14,7 @@ type Cip = {
   id: string; 
   cislo_cipu: string; 
   poznamka: string | null; 
-  osoba_id: string | null; 
-  externi_prijemce: string | null; 
   datum_predani: string | null;
-  osoby?: Osoba | null;
 }
 
 type Vazba = {
@@ -128,7 +125,9 @@ const LABEL = 'block text-xs font-medium text-zinc-500 mb-1'
 
 export default function JednotkyClient({ jednotky: initial, openId }: { jednotky: Jednotka[]; openId?: string }) {
   const [jednotky, setJednotky] = useState(initial)
-  const [vybranaId, setVybranaId] = useState<string | null>(null)
+  const [vybranaId, setVybranaId] = useState<string | null>(() => (
+    openId && initial.some(j => j.id === openId) ? openId : null
+  ))
   const [view, setView] = useState<ModalView>('detail')
   const [vsechnyOsoby, setVsechnyOsoby] = useState<OsobaMinimal[]>([])
   const [mazani, setMazani] = useState(false)
@@ -171,21 +170,25 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   // Add čip form
   const [acCislo, setAcCislo] = useState('')
   const [acPoznamka, setAcPoznamka] = useState('')
-  const [acTypPrijemce, setAcTypPrijemce] = useState<'osoba' | 'externi'>('osoba')
-  const [acOsobaId, setAcOsobaId] = useState('')
-  const [acExterniJmeno, setAcExterniJmeno] = useState('')
   const [acDatum, setAcDatum] = useState(new Date().toISOString().split('T')[0])
 
   const router = useRouter()
   const supabase = createClient()
 
+  function openModal(id: string) {
+    setVybranaId(id)
+    setView('detail')
+    setPotvrzeni(false)
+    setChyba('')
+    setDetailTab('vlastnictvi')
+  }
+
   // Otevřít modal přes URL parametr ?open=ID
   useEffect(() => {
-    if (openId && jednotky.some(j => j.id === openId)) {
-      openModal(openId)
+    if (openId) {
       router.replace('/dashboard/jednotky')
     }
-  }, [openId])
+  }, [openId, router])
 
   const vybrana = jednotky.find(j => j.id === vybranaId) ?? null
 
@@ -213,19 +216,11 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       .select(`
         *, 
         jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), 
-        jednotky_cipy(id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani, osoby(id, jmeno, prijmeni))
+        jednotky_cipy(id, cislo_cipu, poznamka, datum_predani)
       `)
       .order('cislo_jednotky')
     if (data) setJednotky(data as unknown as Jednotka[])
   }, [])
-
-  function openModal(id: string) {
-    setVybranaId(id)
-    setView('detail')
-    setPotvrzeni(false)
-    setChyba('')
-    setDetailTab('vlastnictvi')
-  }
 
   function closeModal() {
     setVybranaId(null)
@@ -272,7 +267,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   }
 
   function openAddCip() {
-    setAcCislo(''); setAcPoznamka(''); setAcTypPrijemce('osoba'); setAcOsobaId(''); setAcExterniJmeno('')
+    setAcCislo(''); setAcPoznamka('')
     setAcDatum(new Date().toISOString().split('T')[0])
     setChyba(''); setView('add-cip')
   }
@@ -310,8 +305,6 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       else if (!avOsoba2 && (avTyp === 'sjm' || avTyp === 'mcp')) setAvOsoba2(data.id)
     } else if (viewPredOsobou === 'add-najemnik' || viewPredOsobou === 'add-bydlici') {
       setAnOsoby(prev => [...prev, data.id])
-    } else if (viewPredOsobou === 'add-cip') {
-      setAcOsobaId(data.id)
     }
 
     // 4. Návrat zpět
@@ -432,8 +425,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       jednotka_id: vybranaId, 
       cislo_cipu: acCislo, 
       poznamka: acPoznamka || null,
-      osoba_id: acTypPrijemce === 'osoba' ? (acOsobaId || null) : null,
-      externi_prijemce: acTypPrijemce === 'externi' ? (acExterniJmeno || null) : null,
+      osoba_id: null,
+      externi_prijemce: null,
       datum_predani: acDatum || null,
     })
     if (error) { setChyba(error.message); setUkladani(false); return }
@@ -958,9 +951,6 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                                           <span className="text-xs font-black text-zinc-900">{c.cislo_cipu}</span>
                                           {c.datum_predani && <span className="text-[9px] font-bold text-zinc-400 tabular-nums">{new Date(c.datum_predani).toLocaleDateString('cs-CZ')}</span>}
                                         </div>
-                                        <p className="text-[11px] font-bold text-zinc-700 truncate">
-                                          {c.osoby ? formatJmeno(c.osoby) : c.externi_prijemce || <span className="text-zinc-300 font-normal italic">nepřiřazen</span>}
-                                        </p>
                                         {c.poznamka && <p className="text-[9px] text-zinc-400 leading-tight mt-1 line-clamp-1">{c.poznamka}</p>}
                                       </div>
                                       <button onClick={() => handleDeleteCip(c.id)} className="text-zinc-300 hover:text-red-500 flex-shrink-0">
@@ -1251,35 +1241,9 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                       <input value={acCislo} onChange={e => setAcCislo(e.target.value)} required placeholder="např. 042" className={INPUT} />
                     </div>
                     <div>
-                      <label className={LABEL}>Datum předání</label>
+                      <label className={LABEL}>Datum přiřazení</label>
                       <input type="date" value={acDatum} onChange={e => setAcDatum(e.target.value)} className={INPUT} />
                     </div>
-                  </div>
-
-                  <div>
-                    <label className={LABEL}>Předáno komu</label>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="grid grid-cols-2 gap-2 flex-1">
-                        {(['osoba', 'externi'] as const).map(t => (
-                          <button key={t} type="button" onClick={() => setAcTypPrijemce(t)}
-                            className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${acTypPrijemce === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
-                            {t === 'osoba' ? 'Osoba ze seznamu' : 'Externí osoba'}
-                          </button>
-                        ))}
-                      </div>
-                      {acTypPrijemce === 'osoba' && (
-                        <button type="button" onClick={openAddOsoba} className="ml-2 text-[10px] bg-violet-50 text-violet-600 hover:bg-violet-100 font-bold px-2 py-0.5 rounded-md transition-colors flex-shrink-0">+ Nová osoba</button>
-                      )}
-                    </div>
-
-                    {acTypPrijemce === 'osoba' ? (
-                      <select value={acOsobaId} onChange={e => setAcOsobaId(e.target.value)} className={INPUT}>
-                        <option value="">— vyberte osobu —</option>
-                        {vsechnyOsoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
-                      </select>
-                    ) : (
-                      <input value={acExterniJmeno} onChange={e => setAcExterniJmeno(e.target.value)} placeholder="Jméno externí osoby" className={INPUT} />
-                    )}
                   </div>
 
                   <div>

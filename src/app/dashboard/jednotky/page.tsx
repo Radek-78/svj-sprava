@@ -14,8 +14,7 @@ export default async function JednotkyPage({ searchParams }: { searchParams: Pro
         osoby(id, jmeno, prijmeni, email, telefon)
       ),
       jednotky_cipy(
-        id, cislo_cipu, poznamka, osoba_id, externi_prijemce, datum_predani,
-        osoby(id, jmeno, prijmeni)
+        id, cislo_cipu, poznamka, datum_predani
       )
     `)
     .order('cislo_jednotky')
