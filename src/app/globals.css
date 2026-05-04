@@ -7,10 +7,15 @@
 body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: #f4f4f5;
+  color: #18181b;
 }
 
 .bg-dot-pattern {
-  background-color: #f8f8f7;
-  background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1px);
-  background-size: 22px 22px;
+  background-color: #f4f4f5;
+  background-image:
+    linear-gradient(rgba(63, 63, 70, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(63, 63, 70, 0.045) 1px, transparent 1px),
+    radial-gradient(circle at 18px 18px, rgba(16, 185, 129, 0.13) 1px, transparent 1.5px);
+  background-size: 28px 28px, 28px 28px, 56px 56px;
 }
