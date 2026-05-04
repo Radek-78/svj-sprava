@@ -6,7 +6,6 @@ import { createClient } from '@/lib/supabase/client'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr, SearchInput } from '@/components/PageShell'
 import { NAVRHY_VCHODU, type NavrhVchodu } from './navrhyVchodu'
 
-type Osoba = { id: string; jmeno: string | null; prijmeni: string }
 type Jednotka = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
 type CipStav = 'aktivni' | 'rezerva' | 'dlouhodobe_nepouzit' | 'ztraceny'
 
@@ -19,7 +18,6 @@ type Cip = {
   externi_prijemce: string | null
   datum_predani: string | null
   jednotka_id: string | null
-  osoby?: Osoba | null
   jednotky?: Jednotka | null
 }
 
@@ -28,22 +26,17 @@ type EvidenceCip = Cip & {
   poradoveCislo: number | null
 }
 
-type CipRow = Omit<Cip, 'osoby' | 'jednotky'> & {
-  osoby?: Osoba | Osoba[] | null
+type CipRow = Omit<Cip, 'jednotky'> & {
   jednotky?: Jednotka | Jednotka[] | null
 }
 
 type ModalView = 'detail' | 'edit' | 'nova'
-type PrijemceTyp = 'zadny' | 'osoba' | 'externi'
 type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
 
 type FormState = {
   cislo_cipu: string
   stav: CipStav
   jednotka_id: string
-  prijemce_typ: PrijemceTyp
-  osoba_id: string
-  externi_prijemce: string
   datum_predani: string
   poznamka: string
 }
@@ -52,9 +45,6 @@ const EMPTY_FORM: FormState = {
   cislo_cipu: '',
   stav: 'aktivni',
   jednotka_id: '',
-  prijemce_typ: 'zadny',
-  osoba_id: '',
-  externi_prijemce: '',
   datum_predani: '',
   poznamka: '',
 }
@@ -70,19 +60,9 @@ const STAV_LABELS: Record<CipStav, string> = {
   ztraceny: 'Ztracený / blokovaný',
 }
 
-function formatJmeno(o: Osoba) {
-  return [o.prijmeni, o.jmeno].filter(Boolean).join(' ')
-}
-
 function formatJednotka(j: Jednotka | null | undefined) {
   if (!j) return 'Sklad / nepřiděleno'
   return j.vchod ? `Byt ${j.cislo_jednotky}, vchod ${j.vchod}` : `Byt ${j.cislo_jednotky}`
-}
-
-function getPrijemce(cip: Pick<Cip, 'osoby' | 'externi_prijemce'>) {
-  if (cip.osoby) return formatJmeno(cip.osoby)
-  if (cip.externi_prijemce) return cip.externi_prijemce
-  return 'Nepřiděleno'
 }
 
 function getCipNumber(cisloCipu: string) {
@@ -108,7 +88,6 @@ function relationOne<T>(value: T | T[] | null | undefined): T | null {
 function normalizeCip(cip: CipRow): Cip {
   return {
     ...cip,
-    osoby: relationOne(cip.osoby),
     jednotky: relationOne(cip.jednotky),
   }
 }
@@ -140,7 +119,6 @@ function buildEvidenceCipy(cipy: Cip[]): EvidenceCip[] {
       externi_prijemce: null,
       datum_predani: null,
       jednotka_id: null,
-      osoby: null,
       jednotky: null,
       jeEvidovany: false,
       poradoveCislo: number,
@@ -186,7 +164,7 @@ function statusBadge(cip: EvidenceCip) {
     )
   }
 
-  const assigned = Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
+  const assigned = Boolean(cip.jednotka_id)
   return assigned ? (
     <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 text-xs font-semibold">
       Přidělený
@@ -220,8 +198,8 @@ function navrhVchoduBadge(navrh: NavrhVchodu | null) {
   )
 }
 
-function jePrideleny(cip: Pick<Cip, 'jednotka_id' | 'osoba_id' | 'externi_prijemce'>) {
-  return Boolean(cip.jednotka_id || cip.osoba_id || cip.externi_prijemce)
+function jePrideleny(cip: Pick<Cip, 'jednotka_id'>) {
+  return Boolean(cip.jednotka_id)
 }
 
 function jeNeznamy(cip: EvidenceCip) {
@@ -255,11 +233,9 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
 export default function CipyClient({
   cipy: initialCipy,
   jednotky,
-  osoby,
 }: {
   cipy: CipRow[]
   jednotky: Jednotka[]
-  osoby: Osoba[]
 }) {
   const [ulozeneCipy, setUlozeneCipy] = useState(initialCipy.map(normalizeCip).sort(numericChipSort))
   const [hledani, setHledani] = useState('')
@@ -289,7 +265,6 @@ export default function CipyClient({
       const jednotka = formatJednotka(c.jednotky).toLowerCase()
       return (
         c.cislo_cipu.toLowerCase().includes(q) ||
-        getPrijemce(c).toLowerCase().includes(q) ||
         (getNavrhVchodu(c)?.vchod.toLowerCase() ?? '').includes(q) ||
         jednotka.includes(q) ||
         (c.stav ? STAV_LABELS[c.stav].toLowerCase().includes(q) : false) ||
@@ -317,7 +292,6 @@ export default function CipyClient({
       .from('jednotky_cipy')
       .select(`
         id, cislo_cipu, stav, poznamka, osoba_id, externi_prijemce, datum_predani, jednotka_id,
-        osoby(id, jmeno, prijmeni),
         jednotky(id, cislo_jednotky, vchod, ulice_vchodu)
       `)
       .order('cislo_cipu')
@@ -383,9 +357,6 @@ export default function CipyClient({
       cislo_cipu: vybrany.cislo_cipu,
       stav: vybrany.stav ?? 'aktivni',
       jednotka_id: vybrany.jednotka_id ?? '',
-      prijemce_typ: vybrany.osoba_id ? 'osoba' : vybrany.externi_prijemce ? 'externi' : 'zadny',
-      osoba_id: vybrany.osoba_id ?? '',
-      externi_prijemce: vybrany.externi_prijemce ?? '',
       datum_predani: vybrany.datum_predani ?? '',
       poznamka: vybrany.poznamka ?? '',
     })
@@ -398,9 +369,9 @@ export default function CipyClient({
       cislo_cipu: form.cislo_cipu.trim(),
       stav: form.stav,
       jednotka_id: form.jednotka_id || null,
-      osoba_id: form.prijemce_typ === 'osoba' ? (form.osoba_id || null) : null,
-      externi_prijemce: form.prijemce_typ === 'externi' ? (form.externi_prijemce.trim() || null) : null,
-      datum_predani: form.prijemce_typ === 'zadny' ? null : (form.datum_predani || null),
+      osoba_id: null,
+      externi_prijemce: null,
+      datum_predani: form.datum_predani || null,
       poznamka: form.poznamka.trim() || null,
     }
   }
@@ -595,11 +566,10 @@ export default function CipyClient({
             </PageTh>
             <PageTh>Čip</PageTh>
             <PageTh>Stav</PageTh>
-            <PageTh>Přiděleno komu</PageTh>
             <PageTh>Byt</PageTh>
             <PageTh>Vchod</PageTh>
             <PageTh>Návrh vchodu</PageTh>
-            <PageTh>Datum předání</PageTh>
+            <PageTh>Datum přiřazení</PageTh>
             <PageTh>Poznámka</PageTh>
           </PageThead>
           <PageTbody>
@@ -624,7 +594,6 @@ export default function CipyClient({
                   </span>
                 </PageTd>
                 <PageTd>{statusBadge(cip)}</PageTd>
-                <PageTd className={getPrijemce(cip) === 'Nepřiděleno' ? 'text-zinc-300' : ''}>{getPrijemce(cip)}</PageTd>
                 <PageTd>
                   {cip.jednotky ? (
                     <span className="font-medium text-zinc-800">{cip.jednotky.cislo_jednotky}</span>
@@ -698,12 +667,12 @@ export default function CipyClient({
                 <div className="p-6">
                   <div className="grid grid-cols-2 gap-4">
                     <DetailBox label="Stav">{statusBadge(vybrany)}</DetailBox>
-                    <DetailBox label="Přiděleno komu">{getPrijemce(vybrany)}</DetailBox>
-                    <DetailBox label="Byt a vchod">{formatJednotka(vybrany.jednotky)}</DetailBox>
+                    <DetailBox label="Bytová jednotka">{vybrany.jednotky?.cislo_jednotky ?? 'Sklad / nepřiděleno'}</DetailBox>
+                    <DetailBox label="Vchod">{vybrany.jednotky?.vchod ?? '—'}</DetailBox>
                     <DetailBox label="Návrh vchodu">{navrhVchoduBadge(getNavrhVchodu(vybrany))}</DetailBox>
                     <DetailBox label="Typ stavu">{vybrany.stav ? STAV_LABELS[vybrany.stav] : '—'}</DetailBox>
                     <DetailBox label="Evidence">{vybrany.jeEvidovany ? 'Uloženo v evidenci' : 'Zatím bez záznamu'}</DetailBox>
-                    <DetailBox label="Datum předání">{vybrany.datum_predani ?? '—'}</DetailBox>
+                    <DetailBox label="Datum přiřazení">{vybrany.datum_predani ?? '—'}</DetailBox>
                   </div>
 
                   <div className="mt-5">
@@ -749,8 +718,8 @@ export default function CipyClient({
                       <input value={form.cislo_cipu} onChange={e => setForm(p => ({ ...p, cislo_cipu: e.target.value }))} required autoFocus className={INPUT} placeholder="např. 042" />
                     </div>
                     <div>
-                      <label className={LABEL}>Datum předání</label>
-                      <input type="date" value={form.datum_predani} onChange={e => setForm(p => ({ ...p, datum_predani: e.target.value }))} className={INPUT} disabled={form.prijemce_typ === 'zadny'} />
+                      <label className={LABEL}>Datum přiřazení</label>
+                      <input type="date" value={form.datum_predani} onChange={e => setForm(p => ({ ...p, datum_predani: e.target.value }))} className={INPUT} />
                     </div>
                   </div>
 
@@ -774,27 +743,6 @@ export default function CipyClient({
                         <option key={j.id} value={j.id}>{formatJednotka(j)}</option>
                       ))}
                     </select>
-                  </div>
-
-                  <div>
-                    <label className={LABEL}>Příjemce</label>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      {(['zadny', 'osoba', 'externi'] as const).map(t => (
-                        <button key={t} type="button" onClick={() => setForm(p => ({ ...p, prijemce_typ: t }))}
-                          className={`py-2 rounded-lg text-xs font-semibold border transition-colors ${form.prijemce_typ === t ? 'bg-zinc-950 text-white border-zinc-950' : 'border-zinc-200 text-zinc-600 hover:border-zinc-400'}`}>
-                          {t === 'zadny' ? 'Bez příjemce' : t === 'osoba' ? 'Osoba' : 'Externí'}
-                        </button>
-                      ))}
-                    </div>
-                    {form.prijemce_typ === 'osoba' && (
-                      <select value={form.osoba_id} onChange={e => setForm(p => ({ ...p, osoba_id: e.target.value }))} className={INPUT}>
-                        <option value="">— vyberte osobu —</option>
-                        {osoby.map(o => <option key={o.id} value={o.id}>{formatJmeno(o)}</option>)}
-                      </select>
-                    )}
-                    {form.prijemce_typ === 'externi' && (
-                      <input value={form.externi_prijemce} onChange={e => setForm(p => ({ ...p, externi_prijemce: e.target.value }))} className={INPUT} placeholder="Jméno příjemce mimo evidenci osob" />
-                    )}
                   </div>
 
                   <div>
