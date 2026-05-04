@@ -31,7 +31,7 @@ type CipRow = Omit<Cip, 'jednotky'> & {
 }
 
 type ModalView = 'detail' | 'edit' | 'nova'
-type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
+type StatFilter = 'vse' | 'pridelene' | 'rezerva' | 'dlouhodobe-nepouzite' | 'bez-zaznamu' | 'bez-zaznamu-s-vchodem' | 'nezname'
 
 type FormState = {
   cislo_cipu: string
@@ -218,6 +218,8 @@ function matchesStatFilter(cip: EvidenceCip, filter: StatFilter) {
       return jePrideleny(cip)
     case 'rezerva':
       return cip.jeEvidovany && cip.stav === 'rezerva'
+    case 'dlouhodobe-nepouzite':
+      return cip.jeEvidovany && cip.stav === 'dlouhodobe_nepouzit'
     case 'bez-zaznamu':
       return !cip.jeEvidovany
     case 'bez-zaznamu-s-vchodem':
@@ -277,6 +279,7 @@ export default function CipyClient({
   const celkem = evidenceCipy.length
   const pridelene = evidenceCipy.filter(jePrideleny).length
   const rezervy = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'rezerva').length
+  const dlouhodobeNepouzite = evidenceCipy.filter(c => c.jeEvidovany && c.stav === 'dlouhodobe_nepouzit').length
   const bezZaznamu = evidenceCipy.filter(c => !c.jeEvidovany)
   const bezZaznamuSVchodem = bezZaznamu.filter(c => getNavrhVchodu(c)).length
   const neznameCipy = evidenceCipy.filter(jeNeznamy).length
@@ -513,6 +516,7 @@ export default function CipyClient({
           { label: 'čipů celkem', value: celkem, active: statFilter === 'vse', onClick: () => toggleStatFilter('vse') },
           { label: 'přiděleno', value: pridelene, dot: 'emerald', color: 'emerald', active: statFilter === 'pridelene', onClick: () => toggleStatFilter('pridelene') },
           { label: 'v rezervě', value: rezervy, dot: 'sky', color: 'sky', active: statFilter === 'rezerva', onClick: () => toggleStatFilter('rezerva') },
+          { label: 'dlouhodobě nepoužitých', value: dlouhodobeNepouzite, dot: 'zinc', color: 'zinc', active: statFilter === 'dlouhodobe-nepouzite', onClick: () => toggleStatFilter('dlouhodobe-nepouzite') },
           { label: 'bez záznamu', value: bezZaznamu.length, dot: 'amber', color: 'amber', active: statFilter === 'bez-zaznamu', onClick: () => toggleStatFilter('bez-zaznamu') },
           { label: 'z nich s návrhem vchodu', value: bezZaznamuSVchodem, dot: 'emerald', color: 'emerald', active: statFilter === 'bez-zaznamu-s-vchodem', onClick: () => toggleStatFilter('bez-zaznamu-s-vchodem') },
           { label: 'neznámých', value: neznameCipy, dot: 'zinc', color: 'zinc', active: statFilter === 'nezname', onClick: () => toggleStatFilter('nezname') },
