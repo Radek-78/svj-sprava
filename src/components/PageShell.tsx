@@ -44,13 +44,13 @@ export default function PageShell({ title, stats, actions, children }: PageShell
 
       {/* Hlavička — pevná výška 56px, identická u všech záložek */}
       <div className="bg-white/[0.92] border-b border-zinc-200/80 px-6 flex-shrink-0 shadow-[0_1px_0_rgba(255,255,255,0.9),0_12px_28px_rgba(15,23,42,0.05)]" style={{ height: 64 }}>
-        <div className="h-full flex items-center justify-between gap-5">
-          <div className="flex items-center gap-6 min-w-0">
+        <div className="h-full flex items-center justify-between gap-5 min-w-0">
+          <div className="flex items-center gap-6 min-w-0 flex-1">
             <div className="flex items-center gap-3 flex-shrink-0 pr-2">
               <span className="h-8 w-1 rounded-full bg-emerald-500" />
               <h1 className="text-base font-black text-zinc-950 whitespace-nowrap tracking-tight">{title}</h1>
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto py-2 pl-1">
+            <div className="flex items-center gap-2 overflow-x-auto py-2 pl-1 pr-4 min-w-0 flex-1">
               {stats.map((s, i) => {
                 const content = (
                   <>
