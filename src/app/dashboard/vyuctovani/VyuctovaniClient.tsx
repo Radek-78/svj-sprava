@@ -234,77 +234,75 @@ export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialE
         </>
       }
     >
-      <div className="p-6 space-y-6">
+      <>
         {message && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+          <div className="m-6 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
             {message}
           </div>
         )}
 
-        <section className="rounded-lg border border-zinc-200 overflow-hidden">
-          <PageTable>
-            <PageThead>
-              <PageTh sortDirection={sortFor('obdobi')} onSort={() => toggleSort('obdobi')}>Období</PageTh>
-              <PageTh sortDirection={sortFor('osoba')} onSort={() => toggleSort('osoba')}>Osoba</PageTh>
-              <PageTh sortDirection={sortFor('jednotka')} onSort={() => toggleSort('jednotka')}>Jednotka</PageTh>
-              <PageTh sortDirection={sortFor('vysledek')} onSort={() => toggleSort('vysledek')}>Výsledek</PageTh>
-              <PageTh sortDirection={sortFor('zalohy')} onSort={() => toggleSort('zalohy')}>Zálohy</PageTh>
-              <PageTh sortDirection={sortFor('voda')} onSort={() => toggleSort('voda')}>Voda</PageTh>
-              <PageTh>Porovnání</PageTh>
-            </PageThead>
-            <PageTbody>
-              {filtrovaneRows.length === 0 ? (
-                <PageEmpty text={hledani ? 'Žádné vyúčtování neodpovídá hledání.' : 'Zatím není uloženo žádné vyúčtování.'} />
-              ) : filtrovaneRows.map(row => {
-                const settlementAlert = settlementWarning(row, sortedRows)
-                const waterAlerts = row.odecty_vodomeru.map(reading => waterWarning(reading, row, sortedRows)).filter(Boolean)
-                return (
-                  <PageTr key={row.id} onClick={() => setVybranaId(row.id)}>
-                    <PageTd>
-                      <div className="font-bold text-zinc-950">{row.rok}</div>
-                      <div className="text-xs text-zinc-400">{row.obdobi_od} až {row.obdobi_do}</div>
-                    </PageTd>
-                    <PageTd>
-                      <div className="font-semibold text-zinc-800">{formatPerson(row.osoby)}</div>
-                      <div className="text-xs text-zinc-400">{row.uzivatel_text}</div>
-                    </PageTd>
-                    <PageTd>
-                      <span className="font-bold text-zinc-900">{row.jednotky?.cislo_jednotky ?? '—'}</span>
-                    </PageTd>
-                    <PageTd>
-                      <span className={row.typ_vysledku === 'nedoplatek' ? 'font-bold text-red-700' : 'font-bold text-emerald-700'}>{resultLabel(row)}</span>
-                      <div className="text-xs text-zinc-400">{compareMessage(row, sortedRows)}</div>
-                    </PageTd>
-                    <PageTd>
-                      <div className="text-zinc-800">{formatMoney(row.predepsana_zaloha)}</div>
-                      <div className="text-xs text-zinc-400">měsíčně cca {formatMoney(row.predepsana_zaloha ? row.predepsana_zaloha / 12 : null)}</div>
-                    </PageTd>
-                    <PageTd>
-                      {row.odecty_vodomeru.length === 0 ? '—' : row.odecty_vodomeru.map(reading => (
-                        <div key={reading.id} className="text-xs leading-5">
-                          <span className="font-bold text-zinc-800">{formatNumber(reading.spotreba, ' m3')}</span>
-                          <span className="text-zinc-400"> · {reading.cislo_merice}</span>
-                        </div>
-                      ))}
-                    </PageTd>
-                    <PageTd>
-                      {settlementAlert || waterAlerts.length > 0 ? (
-                        <div className="space-y-1">
-                          {[settlementAlert, ...waterAlerts].filter(Boolean).map((alert, index) => (
-                            <div key={index} className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">{alert}</div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-emerald-700 font-semibold">Bez výrazné odchylky</span>
-                      )}
-                    </PageTd>
-                  </PageTr>
-                )
-              })}
-            </PageTbody>
-          </PageTable>
-        </section>
-      </div>
+        <PageTable>
+          <PageThead>
+            <PageTh sortDirection={sortFor('obdobi')} onSort={() => toggleSort('obdobi')}>Období</PageTh>
+            <PageTh sortDirection={sortFor('osoba')} onSort={() => toggleSort('osoba')}>Osoba</PageTh>
+            <PageTh sortDirection={sortFor('jednotka')} onSort={() => toggleSort('jednotka')}>Jednotka</PageTh>
+            <PageTh sortDirection={sortFor('vysledek')} onSort={() => toggleSort('vysledek')}>Výsledek</PageTh>
+            <PageTh sortDirection={sortFor('zalohy')} onSort={() => toggleSort('zalohy')}>Zálohy</PageTh>
+            <PageTh sortDirection={sortFor('voda')} onSort={() => toggleSort('voda')}>Voda</PageTh>
+            <PageTh>Porovnání</PageTh>
+          </PageThead>
+          <PageTbody>
+            {filtrovaneRows.length === 0 ? (
+              <PageEmpty text={hledani ? 'Žádné vyúčtování neodpovídá hledání.' : 'Zatím není uloženo žádné vyúčtování.'} />
+            ) : filtrovaneRows.map(row => {
+              const settlementAlert = settlementWarning(row, sortedRows)
+              const waterAlerts = row.odecty_vodomeru.map(reading => waterWarning(reading, row, sortedRows)).filter(Boolean)
+              return (
+                <PageTr key={row.id} onClick={() => setVybranaId(row.id)}>
+                  <PageTd>
+                    <div className="font-bold text-zinc-950">{row.rok}</div>
+                    <div className="text-xs text-zinc-400">{row.obdobi_od} až {row.obdobi_do}</div>
+                  </PageTd>
+                  <PageTd>
+                    <div className="font-semibold text-zinc-800">{formatPerson(row.osoby)}</div>
+                    <div className="text-xs text-zinc-400">{row.uzivatel_text}</div>
+                  </PageTd>
+                  <PageTd>
+                    <span className="font-bold text-zinc-900">{row.jednotky?.cislo_jednotky ?? '—'}</span>
+                  </PageTd>
+                  <PageTd>
+                    <span className={row.typ_vysledku === 'nedoplatek' ? 'font-bold text-red-700' : 'font-bold text-emerald-700'}>{resultLabel(row)}</span>
+                    <div className="text-xs text-zinc-400">{compareMessage(row, sortedRows)}</div>
+                  </PageTd>
+                  <PageTd>
+                    <div className="text-zinc-800">{formatMoney(row.predepsana_zaloha)}</div>
+                    <div className="text-xs text-zinc-400">měsíčně cca {formatMoney(row.predepsana_zaloha ? row.predepsana_zaloha / 12 : null)}</div>
+                  </PageTd>
+                  <PageTd>
+                    {row.odecty_vodomeru.length === 0 ? '—' : row.odecty_vodomeru.map(reading => (
+                      <div key={reading.id} className="text-xs leading-5">
+                        <span className="font-bold text-zinc-800">{formatNumber(reading.spotreba, ' m3')}</span>
+                        <span className="text-zinc-400"> · {reading.cislo_merice}</span>
+                      </div>
+                    ))}
+                  </PageTd>
+                  <PageTd>
+                    {settlementAlert || waterAlerts.length > 0 ? (
+                      <div className="space-y-1">
+                        {[settlementAlert, ...waterAlerts].filter(Boolean).map((alert, index) => (
+                          <div key={index} className="rounded-md bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-800 ring-1 ring-amber-200">{alert}</div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-emerald-700 font-semibold">Bez výrazné odchylky</span>
+                    )}
+                  </PageTd>
+                </PageTr>
+              )
+            })}
+          </PageTbody>
+        </PageTable>
+      </>
 
       {vybrana && (
         <div
