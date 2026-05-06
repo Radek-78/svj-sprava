@@ -33,6 +33,16 @@ const navLinks = [
     ),
   },
   {
+    href: '/dashboard/vyuctovani',
+    label: 'Vyúčtování',
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 3.75h7.128c.597 0 1.169.237 1.591.659l2.622 2.622c.422.422.659.994.659 1.591V20.25H7.5A3 3 0 014.5 17.25V6.75a3 3 0 013-3z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M14.25 3.75V8.25h4.5M8.25 12h7.5M8.25 15h7.5M8.25 18h4.5" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/cipy',
     label: 'Čipy',
     icon: (
