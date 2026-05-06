@@ -1,8 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import VyuctovaniClient from './VyuctovaniClient'
 
-export default async function VyuctovaniPage() {
+export default async function VyuctovaniPage({ searchParams }: { searchParams: Promise<{ open?: string }> }) {
   const supabase = await createClient()
+  const { open } = await searchParams
 
   const { data, error } = await supabase
     .from('vyuctovani_sluzeb')
@@ -16,7 +17,7 @@ export default async function VyuctovaniPage() {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <VyuctovaniClient initialVyuctovani={data ?? []} initialError={error?.message ?? null} />
+      <VyuctovaniClient initialVyuctovani={data ?? []} initialError={error?.message ?? null} openId={open} />
     </div>
   )
 }
