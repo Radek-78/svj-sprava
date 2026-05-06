@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr } from '@/components/PageShell'
 import type { ParsedVyuctovani } from '@/lib/vyuctovani/parser'
@@ -135,6 +135,7 @@ function settlementWarning(row: Settlement, allRows: Settlement[]) {
 
 export default function VyuctovaniClient({ initialVyuctovani, initialError }: { initialVyuctovani: Settlement[]; initialError: string | null }) {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [vyuctovani] = useState(initialVyuctovani)
   const [preview, setPreview] = useState<PreviewItem[]>([])
   const [uploading, setUploading] = useState(false)
@@ -211,10 +212,17 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
         { label: 'upozornění', value: warningCount, dot: warningCount ? 'amber' : 'emerald', color: warningCount ? 'amber' : 'emerald' },
       ]}
       actions={
-        <label className="relative">
-          <input type="file" accept="application/pdf" multiple className="sr-only" onChange={event => handleFiles(event.target.files)} />
-          <AddButton onClick={() => {}}>Import PDF</AddButton>
-        </label>
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf"
+            multiple
+            className="sr-only"
+            onChange={event => handleFiles(event.target.files)}
+          />
+          <AddButton onClick={() => fileInputRef.current?.click()}>Import PDF</AddButton>
+        </>
       }
     >
       <div className="p-6 space-y-6">
