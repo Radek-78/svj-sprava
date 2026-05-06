@@ -17,6 +17,23 @@ type Cip = {
   datum_predani: string | null;
 }
 
+type OdecetVodomeru = {
+  id: string
+  cislo_merice: string
+  typ: string
+  datum_od: string | null
+  datum_do: string | null
+  pocatecni_stav: number | null
+  koncovy_stav: number | null
+  spotreba: number | null
+  vyuctovani_sluzeb?: {
+    id: string
+    rok: number
+    osoba_id: string
+    osoby?: OsobaMinimal | null
+  } | null
+}
+
 type Vazba = {
   id: string
   role: 'vlastnik' | 'najemnik' | 'bydlici'
@@ -45,6 +62,7 @@ type Jednotka = {
   pravdepodobny_pronajem: boolean
   jednotky_osoby: Vazba[]
   jednotky_cipy: Cip[]
+  odecty_vodomeru: OdecetVodomeru[]
 }
 
 type ModalView = 'detail' | 'edit' | 'add-vlastnik' | 'add-najemnik' | 'add-bydlici' | 'add-cip' | 'add-osoba'
@@ -87,6 +105,12 @@ function typVlastnictviBadge(typ: string | null) {
 
 function compareText(a: string, b: string) {
   return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
+}
+
+const numberFormatter = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
+
+function formatNumber(value: number | null | undefined, unit = '') {
+  return typeof value === 'number' ? `${numberFormatter.format(value)}${unit}` : '—'
 }
 
 function getCipNumber(cisloCipu: string) {
@@ -161,7 +185,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
 
   const [hledani, setHledani] = useState('')
-  const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'cipy'>('vlastnictvi')
+  const [detailTab, setDetailTab] = useState<'vlastnictvi' | 'najemnik' | 'pobyt' | 'voda' | 'cipy'>('vlastnictvi')
 
   const [editForm, setEditForm] = useState<EditForm>({
     cislo_jednotky: '', var_symbol: '', vchod: '', ulice_vchodu: '', patro: '', uzitna_plocha: '',
@@ -241,7 +265,8 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
       .select(`
         *, 
         jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, osoby(id, jmeno, prijmeni)), 
-        jednotky_cipy(id, cislo_cipu, poznamka, datum_predani)
+        jednotky_cipy(id, cislo_cipu, poznamka, datum_predani),
+        odecty_vodomeru(id, cislo_merice, typ, datum_od, datum_do, pocatecni_stav, koncovy_stav, spotreba, vyuctovani_sluzeb(id, rok, osoba_id, osoby(id, jmeno, prijmeni)))
       `)
       .order('cislo_jednotky')
     if (data) setJednotky(data as unknown as Jednotka[])
@@ -851,6 +876,7 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                         { key: 'vlastnictvi', label: 'Vlastnictví', count: aktivniVlastnici.length, color: 'emerald' },
                         { key: 'najemnik',    label: 'Nájemník',    count: aktivniNajemnik.length,  color: 'amber'   },
                         { key: 'pobyt',       label: 'Pobyt',       count: aktivniBydlici.length,   color: 'blue'    },
+                        { key: 'voda',        label: 'Voda',        count: (vybrana.odecty_vodomeru || []).length, color: 'sky' },
                         { key: 'cipy',        label: 'Čipy',        count: (vybrana.jednotky_cipy || []).length, color: 'zinc' },
                       ] as const).map(tab => (
                         <button key={tab.key} type="button" onClick={() => setDetailTab(tab.key)}
@@ -999,6 +1025,54 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                                   </div>
                                 </div>
                               ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ── Voda ── */}
+                      {detailTab === 'voda' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-3">
+                            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Odečty vodoměrů</p>
+                          </div>
+                          {(vybrana.odecty_vodomeru || []).length === 0 ? (
+                            <p className="text-sm text-zinc-400 italic">Žádné odečty vody.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {[...(vybrana.odecty_vodomeru || [])]
+                                .sort((a, b) => (a.datum_od ?? '').localeCompare(b.datum_od ?? ''))
+                                .map(o => (
+                                  <div key={o.id} className="rounded-xl border border-sky-100 bg-sky-50/60 p-3">
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-sky-700 ring-1 ring-sky-100">{o.typ}</span>
+                                          <span className="text-xs font-black text-zinc-900">{o.cislo_merice}</span>
+                                        </div>
+                                        <p className="mt-1 text-[10px] text-zinc-400">{o.datum_od ?? '—'} až {o.datum_do ?? '—'}</p>
+                                      </div>
+                                      <span className="text-sm font-black text-sky-800">{formatNumber(o.spotreba, ' m3')}</span>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Počátek</p>
+                                        <p className="font-semibold text-zinc-800">{formatNumber(o.pocatecni_stav)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Konec</p>
+                                        <p className="font-semibold text-zinc-800">{formatNumber(o.koncovy_stav)}</p>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Vyúčtování</p>
+                                        <p className="font-semibold text-zinc-800">{o.vyuctovani_sluzeb?.rok ?? '—'}</p>
+                                      </div>
+                                    </div>
+                                    {o.vyuctovani_sluzeb?.osoby && (
+                                      <p className="mt-2 text-[10px] text-zinc-500">V rámci vyúčtování: {formatJmeno(o.vyuctovani_sluzeb.osoby)}</p>
+                                    )}
+                                  </div>
+                                ))}
                             </div>
                           )}
                         </div>

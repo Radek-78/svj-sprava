@@ -543,7 +543,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     {vybrana.vyuctovani_sluzeb.length === 0 ? (
                       <p className="text-sm text-zinc-400 italic">Žádné vyúčtování.</p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="max-h-[58vh] overflow-y-auto pr-1 space-y-1.5">
                         {[...vybrana.vyuctovani_sluzeb]
                           .sort((a, b) => a.obdobi_od.localeCompare(b.obdobi_od))
                           .map(v => (
@@ -551,36 +551,19 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                               key={v.id}
                               type="button"
                               onClick={() => { closeModal(); router.push(`/dashboard/vyuctovani?open=${v.id}`) }}
-                              className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left transition-colors hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              className="w-full cursor-pointer rounded-lg border border-zinc-200 bg-white px-3 py-2 text-left transition-colors hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                             >
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <p className="text-sm font-black text-zinc-950">{v.rok}</p>
-                                  <p className="mt-0.5 text-[10px] text-zinc-400">Jednotka {v.jednotky?.cislo_jednotky ?? '—'}</p>
-                                </div>
-                                <span className={`text-xs font-black leading-tight ${v.typ_vysledku === 'nedoplatek' ? 'text-red-700' : 'text-emerald-700'}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-sm font-black text-zinc-950">{v.rok}</p>
+                                <span className={`text-xs font-black ${v.typ_vysledku === 'nedoplatek' ? 'text-red-700' : 'text-emerald-700'}`}>
                                   {vyuctovaniLabel(v)}
                                 </span>
                               </div>
-                              <div className="mt-2 grid grid-cols-3 gap-2 text-[10px]">
-                                <div>
-                                  <p className="font-bold uppercase tracking-wide text-zinc-400">Záloha</p>
-                                  <p className="font-semibold text-zinc-800">{formatMoney(v.predepsana_zaloha)}</p>
-                                </div>
-                                <div>
-                                  <p className="font-bold uppercase tracking-wide text-zinc-400">Náklad</p>
-                                  <p className="font-semibold text-zinc-800">{formatMoney(v.naklad_celkem)}</p>
-                                </div>
-                                <div>
-                                  <p className="font-bold uppercase tracking-wide text-zinc-400">Voda</p>
-                                  <p className="font-semibold text-zinc-800">{formatNumber(v.odecty_vodomeru[0]?.spotreba, ' m3')}</p>
-                                </div>
+                              <p className="mt-0.5 text-[10px] text-zinc-400">Jednotka {v.jednotky?.cislo_jednotky ?? '—'} · {v.obdobi_od} až {v.obdobi_do}</p>
+                              <div className="mt-1.5 flex items-center gap-3 text-[10px]">
+                                <span><b className="text-zinc-400 uppercase">Záloha</b> <span className="font-semibold text-zinc-800">{formatMoney(v.predepsana_zaloha)}</span></span>
+                                <span><b className="text-zinc-400 uppercase">Náklad</b> <span className="font-semibold text-zinc-800">{formatMoney(v.naklad_celkem)}</span></span>
                               </div>
-                              {v.odecty_vodomeru[0] && (
-                                <p className="mt-2 truncate rounded-md bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-100">
-                                  {v.odecty_vodomeru[0].typ} {v.odecty_vodomeru[0].cislo_merice}: {formatNumber(v.odecty_vodomeru[0].pocatecni_stav)} → {formatNumber(v.odecty_vodomeru[0].koncovy_stav)}
-                                </p>
-                              )}
                             </button>
                           ))}
                       </div>

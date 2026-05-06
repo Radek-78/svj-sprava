@@ -15,6 +15,10 @@ export default async function JednotkyPage({ searchParams }: { searchParams: Pro
       ),
       jednotky_cipy(
         id, cislo_cipu, poznamka, datum_predani
+      ),
+      odecty_vodomeru(
+        id, cislo_merice, typ, datum_od, datum_do, pocatecni_stav, koncovy_stav, spotreba,
+        vyuctovani_sluzeb(id, rok, osoba_id, osoby(id, jmeno, prijmeni))
       )
     `)
     .order('cislo_jednotky')
