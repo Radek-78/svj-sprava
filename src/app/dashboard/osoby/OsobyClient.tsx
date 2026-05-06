@@ -11,6 +11,31 @@ import OsobaForm, { EditForm, EMPTY_FORM } from '@/components/OsobaForm'
 
 type Jednotka = { id: string; cislo_jednotky: string; ulice_vchodu: string | null; vchod: string | null }
 
+type OdecetVodomeru = {
+  id: string
+  cislo_merice: string
+  typ: string
+  spotreba: number | null
+  pocatecni_stav: number | null
+  koncovy_stav: number | null
+  datum_od: string | null
+  datum_do: string | null
+}
+
+type VyuctovaniSluzeb = {
+  id: string
+  rok: number
+  obdobi_od: string
+  obdobi_do: string
+  typ_vysledku: 'preplatek' | 'nedoplatek' | 'nula'
+  castka: number | null
+  predepsana_zaloha: number | null
+  naklad_celkem: number | null
+  jednotka_id: string
+  jednotky: Jednotka | null
+  odecty_vodomeru: OdecetVodomeru[]
+}
+
 type Vazba = {
   id: string
   role: 'vlastnik' | 'najemnik' | 'bydlici'
@@ -37,6 +62,7 @@ type Osoba = {
   kontaktni_psc: string | null
   poznamka: string | null
   jednotky_osoby: Vazba[]
+  vyuctovani_sluzeb: VyuctovaniSluzeb[]
 }
 
 type ModalView = 'detail' | 'edit' | 'nova'
@@ -82,6 +108,23 @@ function typVlastnictviBadge(typ: string | null) {
 
 function compareText(a: string, b: string) {
   return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
+}
+
+const moneyFormatter = new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 })
+const numberFormatter = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
+
+function formatMoney(value: number | null | undefined) {
+  return typeof value === 'number' ? moneyFormatter.format(value) : '—'
+}
+
+function formatNumber(value: number | null | undefined, unit = '') {
+  return typeof value === 'number' ? `${numberFormatter.format(value)}${unit}` : '—'
+}
+
+function vyuctovaniLabel(v: VyuctovaniSluzeb) {
+  if (v.typ_vysledku === 'nedoplatek') return `Nedoplatek ${formatMoney(v.castka)}`
+  if (v.typ_vysledku === 'preplatek') return `Přeplatek ${formatMoney(v.castka)}`
+  return 'Vyrovnáno'
 }
 
 // ─── Hlavní komponenta ────────────────────────────────────────────────────────
@@ -171,7 +214,15 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
   const refreshOsoby = useCallback(async () => {
     const { data } = await supabase
       .from('osoby')
-      .select(`*, jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, jednotky(id, cislo_jednotky, ulice_vchodu, vchod))`)
+      .select(`
+        *,
+        jednotky_osoby(id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni, jednotky(id, cislo_jednotky, ulice_vchodu, vchod)),
+        vyuctovani_sluzeb(
+          id, rok, obdobi_od, obdobi_do, typ_vysledku, castka, predepsana_zaloha, naklad_celkem, jednotka_id,
+          jednotky(id, cislo_jednotky, ulice_vchodu, vchod),
+          odecty_vodomeru(id, cislo_merice, typ, spotreba, pocatecni_stav, koncovy_stav, datum_od, datum_do)
+        )
+      `)
       .order('prijmeni')
     if (data) setOsoby(data as Osoba[])
   }, [])
@@ -438,7 +489,7 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                     </div>
                   </div>
 
-                  {/* Prostřední panel – jednotky */}
+                  {/* Prostřední panel – jednotky + vyúčtování */}
                   <div className="flex-1 overflow-y-auto p-5 border-r border-zinc-100">
                     <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Jednotky</p>
                     {vybrana.jednotky_osoby.length === 0 ? (
@@ -483,6 +534,61 @@ export default function OsobyClient({ osoby: initial, openId }: { osoby: Osoba[]
                           ))}
                       </div>
                     )}
+
+                    <div className="mt-6 border-t border-zinc-100 pt-5">
+                      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-3">Vyúčtování</p>
+                      {vybrana.vyuctovani_sluzeb.length === 0 ? (
+                        <p className="text-sm text-zinc-400 italic">Žádné vyúčtování.</p>
+                      ) : (
+                        <div className="space-y-2">
+                          {[...vybrana.vyuctovani_sluzeb]
+                            .sort((a, b) => a.obdobi_od.localeCompare(b.obdobi_od))
+                            .map(v => (
+                              <div key={v.id} className="rounded-xl border border-zinc-200 bg-white px-4 py-3">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="font-semibold text-sm text-zinc-900">{v.rok}</span>
+                                      <span className="text-xs text-zinc-400">
+                                        Jednotka {v.jednotky?.cislo_jednotky ?? '—'}
+                                      </span>
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-zinc-400">{v.obdobi_od} až {v.obdobi_do}</p>
+                                  </div>
+                                  <span className={`text-xs font-black ${v.typ_vysledku === 'nedoplatek' ? 'text-red-700' : 'text-emerald-700'}`}>
+                                    {vyuctovaniLabel(v)}
+                                  </span>
+                                </div>
+                                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Záloha</p>
+                                    <p className="font-semibold text-zinc-800">{formatMoney(v.predepsana_zaloha)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Náklad</p>
+                                    <p className="font-semibold text-zinc-800">{formatMoney(v.naklad_celkem)}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">Voda</p>
+                                    <p className="font-semibold text-zinc-800">
+                                      {formatNumber(v.odecty_vodomeru[0]?.spotreba, ' m3')}
+                                    </p>
+                                  </div>
+                                </div>
+                                {v.odecty_vodomeru.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-1.5">
+                                    {v.odecty_vodomeru.map(o => (
+                                      <span key={o.id} className="rounded-md bg-sky-50 px-2 py-1 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-100">
+                                        {o.typ} {o.cislo_merice}: {formatNumber(o.pocatecni_stav)} → {formatNumber(o.koncovy_stav)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Pravý panel – poznámka */}

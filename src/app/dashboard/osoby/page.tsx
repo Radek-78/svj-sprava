@@ -12,6 +12,11 @@ export default async function OsobyPage({ searchParams }: { searchParams: Promis
       jednotky_osoby(
         id, role, typ_vlastnictvi, podil_citatel, podil_jmenovatel, datum_od, datum_do, je_aktivni,
         jednotky(id, cislo_jednotky, ulice_vchodu, vchod)
+      ),
+      vyuctovani_sluzeb(
+        id, rok, obdobi_od, obdobi_do, typ_vysledku, castka, predepsana_zaloha, naklad_celkem, jednotka_id,
+        jednotky(id, cislo_jednotky, ulice_vchodu, vchod),
+        odecty_vodomeru(id, cislo_merice, typ, spotreba, pocatecni_stav, koncovy_stav, datum_od, datum_do)
       )
     `)
     .order('prijmeni')
