@@ -70,6 +70,23 @@ function personScore(person, sourceName) {
   ), 0)
 }
 
+function splitPersonName(sourceName) {
+  const titleRe = /^(ing\.?|bc\.?|mgr\.?|mudr\.?|judr\.?|phdr\.?|mga\.?|dis\.?)$/i
+  const parts = (sourceName ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(part => part && !titleRe.test(part))
+  if (parts.length === 0) return { jmeno: null, prijmeni: sourceName?.trim() || 'Neznámá osoba' }
+  if (parts.length === 1) return { jmeno: null, prijmeni: parts[0] }
+  const prijmeni = parts.at(-1)
+  const jmeno = parts.slice(0, -1).join(' ')
+  return {
+    jmeno: jmeno || null,
+    prijmeni,
+  }
+}
+
 function parsePeriod(text) {
   const match = text.match(/VY[ÚU]ČTOV[ÁA]N[ÍI]\s+ZA\s+OBDOB[ÍI]\s+(\d{1,2}\.\d{1,2}\.\d{4})\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/i)
   const obdobiOd = parseCzechDate(match?.[1])
@@ -214,6 +231,35 @@ async function saveImport(supabase, item) {
   return 'saved'
 }
 
+async function createHistoricalOwner(supabase, parsed, jednotka) {
+  const name = splitPersonName(parsed.uzivatelText)
+  const { data: osoba, error: osobaError } = await supabase
+    .from('osoby')
+    .insert({
+      jmeno: name.jmeno,
+      prijmeni: name.prijmeni,
+      poznamka: `Založeno automaticky z vyúčtování ${parsed.rok}.`,
+    })
+    .select('id, jmeno, prijmeni, email')
+    .single()
+  if (osobaError) throw osobaError
+
+  const { error: vazbaError } = await supabase
+    .from('jednotky_osoby')
+    .insert({
+      jednotka_id: jednotka.id,
+      osoba_id: osoba.id,
+      role: 'vlastnik',
+      typ_vlastnictvi: 'individualni',
+      datum_od: parsed.obdobiOd,
+      datum_do: parsed.obdobiDo,
+      je_aktivni: false,
+    })
+  if (vazbaError) throw vazbaError
+
+  return osoba
+}
+
 function printItem(item) {
   const { parsed, osoba, jednotka, warnings } = item
   console.log(`\n${parsed.fileName}`)
@@ -256,10 +302,19 @@ async function main() {
   for (const file of files) {
     const parsed = await parsePdf(file)
     const jednotka = jednotky.find(j => j.cislo_jednotky === parsed.cisloJednotky) ?? null
-    const osoba = osoby
+    let osoba = osoby
       .map(o => ({ ...o, score: personScore(o, parsed.uzivatelText) }))
       .filter(o => o.score >= 70)
       .sort((a, b) => b.score - a.score)[0] ?? null
+
+    if (save && !osoba && jednotka && parsed.uzivatelText && parsed.obdobiOd && parsed.obdobiDo) {
+      osoba = await createHistoricalOwner(supabase, parsed, jednotka)
+      osoby.push(osoba)
+      console.log(`\n${parsed.fileName}`)
+      console.log(`  založena historická osoba: ${[osoba.prijmeni, osoba.jmeno].filter(Boolean).join(' ')}`)
+      console.log(`  vytvořena historická vazba vlastníka k jednotce ${jednotka.cislo_jednotky} pro období ${parsed.obdobiOd} až ${parsed.obdobiDo}`)
+    }
+
     const warnings = []
     if (!jednotka) warnings.push('Jednotka nebyla nalezena v DB.')
     if (!osoba) warnings.push('Osoba nebyla spolehlivě nalezena v DB.')
