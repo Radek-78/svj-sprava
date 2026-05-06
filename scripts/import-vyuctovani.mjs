@@ -154,6 +154,22 @@ function collectPdfFiles(targetPath) {
 
 async function saveImport(supabase, item) {
   const { parsed, osoba, jednotka } = item
+  let existingQuery = supabase
+    .from('vyuctovani_sluzeb')
+    .select('id')
+    .eq('osoba_id', osoba.id)
+    .eq('jednotka_id', jednotka.id)
+    .eq('rok', parsed.rok)
+    .limit(1)
+
+  existingQuery = parsed.cisloDokladu
+    ? existingQuery.eq('cislo_dokladu', parsed.cisloDokladu)
+    : existingQuery.is('cislo_dokladu', null)
+
+  const { data: existing, error: existingError } = await existingQuery.maybeSingle()
+  if (existingError) throw existingError
+  if (existing) return 'skipped-existing'
+
   const { data: vyuctovani, error } = await supabase
     .from('vyuctovani_sluzeb')
     .upsert({
@@ -195,6 +211,7 @@ async function saveImport(supabase, item) {
       })), { onConflict: 'vyuctovani_id,cislo_merice,datum_od,datum_do' })
     if (metersError) throw metersError
   }
+  return 'saved'
 }
 
 function printItem(item) {
@@ -256,9 +273,14 @@ async function main() {
         skipped++
         console.log('  přeskočeno: nejdřív oprav mapování nebo data')
       } else {
-        await saveImport(supabase, item)
-        saved++
-        console.log('  uloženo')
+        const result = await saveImport(supabase, item)
+        if (result === 'skipped-existing') {
+          skipped++
+          console.log('  přeskočeno: stejné vyúčtování už v DB existuje')
+        } else {
+          saved++
+          console.log('  uloženo')
+        }
       }
     }
   }
