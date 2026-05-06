@@ -1,9 +1,7 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import PageShell, { AddButton, PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr } from '@/components/PageShell'
-import type { ParsedVyuctovani } from '@/lib/vyuctovani/parser'
+import { useMemo, useState } from 'react'
+import PageShell, { PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, PageTr } from '@/components/PageShell'
 
 type Person = { id: string; jmeno: string | null; prijmeni: string; email: string | null }
 type Unit = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
@@ -42,40 +40,10 @@ type Settlement = {
   odecty_vodomeru: MeterReading[]
 }
 
-type PreviewCandidate = {
-  id: string
-  jmeno?: string | null
-  prijmeni?: string
-  email?: string | null
-  cislo_jednotky?: string
-  vchod?: string | null
-  ulice_vchodu?: string | null
-  score?: number
-}
-
-type PreviewItem = {
-  clientId: string
-  parsed: Omit<ParsedVyuctovani, 'rawText'>
-  osobaCandidates: PreviewCandidate[]
-  jednotkaCandidates: PreviewCandidate[]
-  selectedOsobaId: string | null
-  selectedJednotkaId: string | null
-}
-
 const moneyFormatter = new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 })
 const numberFormatter = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
 
-async function readApiResponse(response: Response) {
-  const text = await response.text()
-  if (!text) return {}
-  try {
-    return JSON.parse(text)
-  } catch {
-    return { error: text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || 'Server vrátil nečitelnou odpověď.' }
-  }
-}
-
-function formatPerson(person: Person | PreviewCandidate | null) {
+function formatPerson(person: Person | null) {
   if (!person) return 'Neznámá osoba'
   return [person.prijmeni, person.jmeno].filter(Boolean).join(' ')
 }
@@ -144,13 +112,8 @@ function settlementWarning(row: Settlement, allRows: Settlement[]) {
 }
 
 export default function VyuctovaniClient({ initialVyuctovani, initialError }: { initialVyuctovani: Settlement[]; initialError: string | null }) {
-  const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [vyuctovani] = useState(initialVyuctovani)
-  const [preview, setPreview] = useState<PreviewItem[]>([])
-  const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [message, setMessage] = useState(initialError ? `Tabulka vyúčtování zatím není dostupná: ${initialError}` : '')
+  const [message] = useState(initialError ? `Tabulka vyúčtování zatím není dostupná: ${initialError}` : '')
 
   const sortedRows = useMemo(
     () => [...vyuctovani].sort((a, b) => a.obdobi_od.localeCompare(b.obdobi_od) || a.rok - b.rok),
@@ -163,56 +126,6 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
     return count + settlement + water
   }, 0)
 
-  async function handleFiles(files: FileList | null) {
-    if (!files?.length) return
-    setUploading(true)
-    setMessage('')
-    const formData = new FormData()
-    Array.from(files).forEach(file => formData.append('files', file))
-    const response = await fetch('/api/import/vyuctovani/preview', { method: 'POST', body: formData })
-    const data = await readApiResponse(response)
-    setUploading(false)
-    if (!response.ok) {
-      setMessage(data.error ?? 'Import se nepodařilo načíst.')
-      return
-    }
-    setPreview(data.results ?? [])
-  }
-
-  function updateSelection(clientId: string, key: 'selectedOsobaId' | 'selectedJednotkaId', value: string) {
-    setPreview(items => items.map(item => item.clientId === clientId ? { ...item, [key]: value || null } : item))
-  }
-
-  async function saveImport() {
-    const incomplete = preview.find(item => !item.selectedOsobaId || !item.selectedJednotkaId)
-    if (incomplete) {
-      setMessage('Před uložením je potřeba u všech souborů vybrat osobu i jednotku.')
-      return
-    }
-    setSaving(true)
-    setMessage('')
-    const response = await fetch('/api/import/vyuctovani/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        items: preview.map(item => ({
-          parsed: item.parsed,
-          osobaId: item.selectedOsobaId,
-          jednotkaId: item.selectedJednotkaId,
-        })),
-      }),
-    })
-    const data = await readApiResponse(response)
-    setSaving(false)
-    if (!response.ok) {
-      setMessage(data.error ?? 'Uložení se nepodařilo.')
-      return
-    }
-    setPreview([])
-    setMessage(`Uloženo ${data.saved?.length ?? 0} vyúčtování.`)
-    router.refresh()
-  }
-
   return (
     <PageShell
       title="Vyúčtování"
@@ -221,19 +134,6 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
         { label: 'odečtů', value: readings.length, dot: 'sky', color: 'sky' },
         { label: 'upozornění', value: warningCount, dot: warningCount ? 'amber' : 'emerald', color: warningCount ? 'amber' : 'emerald' },
       ]}
-      actions={
-        <>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/pdf"
-            multiple
-            className="sr-only"
-            onChange={event => handleFiles(event.target.files)}
-          />
-          <AddButton onClick={() => fileInputRef.current?.click()}>Import PDF</AddButton>
-        </>
-      }
     >
       <div className="p-6 space-y-6">
         {message && (
@@ -244,73 +144,24 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
 
         <section className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-5">
           <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-black text-zinc-950">Import vyúčtování</h2>
-                <p className="mt-1 text-xs leading-5 text-zinc-500">PDF se použije pouze pro načtení dat. Do databáze se ukládá osoba, jednotka, období, zálohy, výsledek a odečty.</p>
-              </div>
-              {uploading && <span className="rounded-full bg-sky-100 px-2 py-1 text-xs font-bold text-sky-800">Načítám</span>}
-            </div>
+            <h2 className="text-sm font-black text-zinc-950">Lokální import PDF</h2>
+            <p className="mt-1 text-xs leading-5 text-zinc-500">
+              PDF se zpracuje na počítači a do databáze se pošlou jen vyčtená data. Webová část slouží jako přehled a kontrola uložených výsledků.
+            </p>
           </div>
 
-          <div className="rounded-lg border border-zinc-200 bg-white">
-            <div className="border-b border-zinc-100 px-4 py-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-zinc-950">Náhled před uložením</h2>
-              {preview.length > 0 && (
-                <button
-                  type="button"
-                  onClick={saveImport}
-                  disabled={saving}
-                  className="rounded-lg bg-zinc-950 px-3 py-2 text-xs font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
-                >
-                  {saving ? 'Ukládám…' : 'Uložit potvrzené'}
-                </button>
-              )}
-            </div>
-            {preview.length === 0 ? (
-              <div className="px-4 py-8 text-sm text-zinc-400">Po výběru PDF se tady zobrazí kontrolní náhled.</div>
-            ) : (
-              <div className="divide-y divide-zinc-100">
-                {preview.map(item => (
-                  <div key={item.clientId} className="p-4">
-                    <div className="grid grid-cols-1 xl:grid-cols-[1fr_220px_220px] gap-3">
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">{item.parsed.fileName}</p>
-                        <p className="mt-1 text-sm font-black text-zinc-950">
-                          {item.parsed.rok ?? 'Rok ?'} · {item.parsed.typVysledku === 'nedoplatek' ? 'Nedoplatek' : 'Přeplatek'} {formatMoney(item.parsed.castka)}
-                        </p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          Zálohy {formatMoney(item.parsed.predepsanaZaloha)} · náklad {formatMoney(item.parsed.nakladCelkem)} · vodoměr {item.parsed.vodomery[0]?.cisloMerice ?? 'nenalezen'}
-                        </p>
-                        {item.parsed.warnings.length > 0 && (
-                          <p className="mt-2 text-xs font-semibold text-amber-700">{item.parsed.warnings.join(' ')}</p>
-                        )}
-                      </div>
-                      <select
-                        value={item.selectedOsobaId ?? ''}
-                        onChange={event => updateSelection(item.clientId, 'selectedOsobaId', event.target.value)}
-                        className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900"
-                      >
-                        <option value="">Vybrat osobu</option>
-                        {item.osobaCandidates.map(person => (
-                          <option key={person.id} value={person.id}>{formatPerson(person)} {person.score ? `(${person.score})` : ''}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={item.selectedJednotkaId ?? ''}
-                        onChange={event => updateSelection(item.clientId, 'selectedJednotkaId', event.target.value)}
-                        className="h-10 rounded-lg border border-zinc-200 bg-white px-3 text-sm text-zinc-900"
-                      >
-                        <option value="">Vybrat jednotku</option>
-                        {item.jednotkaCandidates.map(unit => (
-                          <option key={unit.id} value={unit.id}>Jednotka {unit.cislo_jednotky}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                ))}
+          <div className="rounded-lg border border-zinc-200 bg-white p-4">
+            <h2 className="text-sm font-black text-zinc-950">Postup importu</h2>
+            <div className="mt-3 grid gap-3 text-sm">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">1. Kontrolní náhled</p>
+                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani -- &quot;C:\cesta\k\pdf-nebo-slozce&quot;</code>
               </div>
-            )}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">2. Uložení do DB</p>
+                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani -- &quot;C:\cesta\k\pdf-nebo-slozce&quot; --save</code>
+              </div>
+            </div>
           </div>
         </section>
 
