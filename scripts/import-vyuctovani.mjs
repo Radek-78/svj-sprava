@@ -30,6 +30,10 @@ function normalizeText(text) {
   return text.replace(/\r/g, '').replace(/\u00a0/g, ' ').replace(/[ \t]+/g, ' ').trim()
 }
 
+function compactText(text) {
+  return normalizeText(text).replace(/\s+/g, ' ')
+}
+
 function parseCzechNumber(value) {
   if (!value) return null
   const normalized = value.replace(/\s/g, '').replace(',', '.')
@@ -46,6 +50,13 @@ function parseCzechDate(value) {
 
 function firstMatch(text, pattern) {
   return text.match(pattern)?.[1]?.trim() ?? null
+}
+
+function cleanupExtractedName(value) {
+  return (value ?? '')
+    .replace(/\s+/g, ' ')
+    .replace(/([A-Za-zÁ-ž])\s+([áéíóúůýčďěňřšťžÁÉÍÓÚŮÝČĎĚŇŘŠŤŽ])/g, '$1$2')
+    .trim()
 }
 
 function normalizePersonName(value) {
@@ -88,7 +99,7 @@ function splitPersonName(sourceName) {
 }
 
 function parsePeriod(text) {
-  const match = text.match(/VY[ÚU]ČTOV[ÁA]N[ÍI]\s+ZA\s+OBDOB[ÍI]\s+(\d{1,2}\.\d{1,2}\.\d{4})\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/i)
+  const match = text.match(/VY[ÚU]ČTOV[ÁA]N[ÍI](?:\s+SLUŽEB)?\s+ZA(?:\s+OBDOB[ÍI])?\s+(\d{1,2}\.\d{1,2}\.\d{4})\s*-\s*(\d{1,2}\.\d{1,2}\.\d{4})/i)
   const obdobiOd = parseCzechDate(match?.[1])
   const obdobiDo = parseCzechDate(match?.[2])
   return { obdobiOd, obdobiDo, rok: obdobiDo ? Number(obdobiDo.slice(0, 4)) : null }
@@ -138,25 +149,100 @@ function parseWaterMeters(rawText) {
   return meters
 }
 
+function parseSoupisResult(block) {
+  const text = compactText(block)
+  const result = text.match(/CELKEM\s+(P\s*Ř\s*EPLATEK|PŘEPLATEK|PREPLATEK|NEDOPLATEK)\s+([+-]?\d[\d\s]*[,.]\d{2})/i)
+  if (!result) return { typVysledku: 'nula', castka: null }
+  return {
+    typVysledku: result[1].replace(/\s/g, '').toUpperCase().includes('NEDOPLATEK') ? 'nedoplatek' : 'preplatek',
+    castka: Math.abs(parseCzechNumber(result[2]) ?? 0),
+  }
+}
+
+function parseSoupisTotals(block) {
+  const text = compactText(block)
+  const total = text.match(/Za\s+obdob[íi]\s+celkem\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})/i)
+  return {
+    zaplacenaZaloha: parseCzechNumber(total?.[2]),
+    predepsanaZaloha: parseCzechNumber(total?.[2]),
+    nakladCelkem: parseCzechNumber(total?.[1]),
+    celkovyPredpis: null,
+    nevyuctovatelnePredpis: null,
+    prispevekSpravaDomu: null,
+  }
+}
+
+function parseSoupisWater(block, period) {
+  const text = compactText(block)
+  const water = text.match(/Studen[áa]\s+voda[\s\S]{0,180}?\bSV\s+([+-]?\d[\d\s]*[,.]\d{1,3})\s*m3/i)
+  const spotreba = parseCzechNumber(water?.[1])
+  if (spotreba === null) return []
+  return [{
+    typ: 'SV',
+    cisloMerice: null,
+    datumOd: period.obdobiOd,
+    datumDo: period.obdobiDo,
+    spotreba,
+    pocatecniStav: null,
+    koncovyStav: null,
+  }]
+}
+
+function parseSoupisPdfItems(filePath, rawText) {
+  const text = rawText.replace(/\r/g, '').replace(/\u00a0/g, ' ')
+  const period = parsePeriod(compactText(text))
+  const userPattern = /Uživatel:\s*(\d{8,})\s+([^\n]+?)\s+Byt\s*č\.\s*(\d+[A-Z]?)/gi
+  const users = [...text.matchAll(userPattern)].map(match => ({
+    index: match.index ?? 0,
+    end: (match.index ?? 0) + match[0].length,
+    cisloDokladu: match[1],
+    uzivatelText: cleanupExtractedName(match[2]),
+    cisloJednotky: match[3],
+  }))
+
+  if (users.length < 2) return null
+
+  return users.map((user, index) => {
+    const preUserStart = index === 0 ? 0 : users[index - 1].end
+    const postUserEnd = users[index + 1]?.index ?? text.length
+    const preUserBlock = text.slice(preUserStart, user.index)
+    const postUserBlock = text.slice(user.end, postUserEnd)
+    return {
+      fileName: `${path.basename(filePath)}#${user.cisloJednotky}`,
+      cisloDokladu: user.cisloDokladu,
+      variabilniSymbol: user.cisloDokladu,
+      cisloJednotky: user.cisloJednotky,
+      uzivatelText: user.uzivatelText,
+      ...period,
+      ...parseSoupisResult(postUserBlock),
+      ...parseSoupisTotals(preUserBlock),
+      vodomery: parseSoupisWater(preUserBlock, period),
+    }
+  })
+}
+
 async function parsePdf(filePath) {
   const buffer = fs.readFileSync(filePath)
   const parser = new PDFParse({ data: buffer })
   const pdf = await parser.getText()
   await parser.destroy()
   const rawText = pdf.text
+  const soupisItems = parseSoupisPdfItems(filePath, rawText)
+  if (soupisItems) return soupisItems
+
   const text = normalizeText(rawText)
   const originalLines = rawText.replace(/\r/g, '').split('\n')
-  return {
+  return [{
     fileName: path.basename(filePath),
     cisloDokladu: originalLines.find(line => /^\d{8,}$/.test(line.trim()))?.trim() ?? null,
     variabilniSymbol: text.match(/\b\d{8,}[A-Z]\d+[A-Z]\b/)?.[0] ?? null,
     cisloJednotky: firstMatch(text, /Č\.\s*prostoru\s+(\d+[A-Z]?)/i) ?? firstMatch(text, /Č\.\s*jednotky\s+(\d+[A-Z]?)/i) ?? firstMatch(text, /\bB(\d{2,4}[A-Z]?)S\b/i),
-    uzivatelText: originalLines.find(line => line.trim().startsWith('Uživatel:'))?.replace(/^Uživatel:\s*/i, '').trim() ?? null,
+    uzivatelText: cleanupExtractedName(originalLines.find(line => line.trim().startsWith('Uživatel:'))?.replace(/^Uživatel:\s*/i, '').trim() ?? null),
     ...parsePeriod(text),
     ...parseResult(text),
     ...parseTotals(text),
     vodomery: parseWaterMeters(rawText),
-  }
+  }]
 }
 
 function collectPdfFiles(targetPath) {
@@ -231,6 +317,30 @@ async function saveImport(supabase, item) {
   return 'saved'
 }
 
+function buildLatestMeterMap(odecty) {
+  const map = new Map()
+  for (const odect of odecty ?? []) {
+    if (!odect.jednotka_id || !odect.cislo_merice || odect.typ !== 'SV') continue
+    const current = map.get(odect.jednotka_id)
+    const currentDate = current?.datum_do ?? ''
+    const nextDate = odect.datum_do ?? ''
+    if (!current || nextDate >= currentDate) map.set(odect.jednotka_id, odect.cislo_merice)
+  }
+  return map
+}
+
+function fillMissingMeterNumbers(parsed, jednotka, latestMeters) {
+  if (!jednotka) return []
+  const warnings = []
+  for (const vodomer of parsed.vodomery) {
+    if (vodomer.cisloMerice) continue
+    const latest = latestMeters.get(jednotka.id)
+    vodomer.cisloMerice = latest ?? `SV-${jednotka.cislo_jednotky}`
+    if (!latest) warnings.push(`V soupisu chybí číslo vodoměru, použito náhradní ${vodomer.cisloMerice}.`)
+  }
+  return warnings
+}
+
 async function createHistoricalOwner(supabase, parsed, jednotka) {
   const name = splitPersonName(parsed.uzivatelText)
   const { data: osoba, error: osobaError } = await supabase
@@ -287,21 +397,29 @@ async function main() {
   if (!supabaseUrl || !supabaseKey) throw new Error('Chybí NEXT_PUBLIC_SUPABASE_URL nebo SUPABASE_SERVICE_ROLE_KEY v .env.local.')
 
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false, autoRefreshToken: false } })
-  const [{ data: osoby, error: osobyError }, { data: jednotky, error: jednotkyError }] = await Promise.all([
+  const [{ data: osoby, error: osobyError }, { data: jednotky, error: jednotkyError }, { data: odecty, error: odectyError }] = await Promise.all([
     supabase.from('osoby').select('id, jmeno, prijmeni, email'),
     supabase.from('jednotky').select('id, cislo_jednotky, vchod, ulice_vchodu').order('cislo_jednotky'),
+    supabase.from('odecty_vodomeru').select('jednotka_id, cislo_merice, typ, datum_do').order('datum_do', { ascending: false }),
   ])
   if (osobyError) throw osobyError
   if (jednotkyError) throw jednotkyError
+  if (odectyError) throw odectyError
+  const latestMeters = buildLatestMeterMap(odecty)
 
   const files = collectPdfFiles(target)
   console.log(`${save ? 'UKLÁDÁM' : 'NÁHLED'}: nalezeno ${files.length} PDF`)
 
   let saved = 0
   let skipped = 0
+  let parsedCount = 0
   for (const file of files) {
-    const parsed = await parsePdf(file)
+    const parsedItems = await parsePdf(file)
+    parsedCount += parsedItems.length
+    if (parsedItems.length > 1) console.log(`\n${path.basename(file)}: rozpoznán soupis, položek ${parsedItems.length}`)
+    for (const parsed of parsedItems) {
     const jednotka = jednotky.find(j => j.cislo_jednotky === parsed.cisloJednotky) ?? null
+    const meterWarnings = fillMissingMeterNumbers(parsed, jednotka, latestMeters)
     let osoba = osoby
       .map(o => ({ ...o, score: personScore(o, parsed.uzivatelText) }))
       .filter(o => o.score >= 70)
@@ -320,11 +438,13 @@ async function main() {
     if (!osoba) warnings.push('Osoba nebyla spolehlivě nalezena v DB.')
     if (!parsed.rok || !parsed.obdobiOd || !parsed.obdobiDo) warnings.push('Chybí období vyúčtování.')
     if (parsed.vodomery.length === 0) warnings.push('Nenalezen žádný vodoměr.')
+    warnings.push(...meterWarnings)
+    const hasBlockingWarnings = !jednotka || !osoba || !parsed.rok || !parsed.obdobiOd || !parsed.obdobiDo
     const item = { parsed, jednotka, osoba, warnings }
     printItem(item)
 
     if (save) {
-      if (warnings.length > 0) {
+      if (hasBlockingWarnings) {
         skipped++
         console.log('  přeskočeno: nejdřív oprav mapování nebo data')
       } else {
@@ -338,9 +458,10 @@ async function main() {
         }
       }
     }
+    }
   }
 
-  console.log(`\nHotovo. Uloženo: ${saved}, přeskočeno: ${skipped}, režim: ${save ? 'save' : 'dry-run'}.`)
+  console.log(`\nHotovo. Načteno položek: ${parsedCount}. Uloženo: ${saved}, přeskočeno: ${skipped}, režim: ${save ? 'save' : 'dry-run'}.`)
 }
 
 main().catch(error => {
