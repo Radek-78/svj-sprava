@@ -42,6 +42,9 @@ type Settlement = {
   odecty_vodomeru: MeterReading[]
 }
 
+type SortDirection = 'asc' | 'desc'
+type VyuctovaniSortKey = 'obdobi' | 'osoba' | 'jednotka' | 'vysledek' | 'zalohy' | 'voda'
+
 const moneyFormatter = new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 })
 const numberFormatter = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
 
@@ -56,6 +59,10 @@ function formatMoney(value: number | null | undefined) {
 
 function formatNumber(value: number | null | undefined, unit = '') {
   return typeof value === 'number' ? `${numberFormatter.format(value)}${unit}` : '—'
+}
+
+function compareText(a: string, b: string) {
+  return a.localeCompare(b, 'cs', { numeric: true, sensitivity: 'base' })
 }
 
 function signedAmount(row: Settlement) {
@@ -120,12 +127,23 @@ export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialE
   const [vybranaId, setVybranaId] = useState<string | null>(() => (
     openId && initialVyuctovani.some(v => v.id === openId) ? openId : null
   ))
+  const [sortKey, setSortKey] = useState<VyuctovaniSortKey>('jednotka')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [message] = useState(initialError ? `Tabulka vyúčtování zatím není dostupná: ${initialError}` : '')
 
-  const sortedRows = useMemo(
-    () => [...vyuctovani].sort((a, b) => a.obdobi_od.localeCompare(b.obdobi_od) || a.rok - b.rok),
-    [vyuctovani]
-  )
+  const sortedRows = useMemo(() => {
+    const sorted = [...vyuctovani].sort((a, b) => {
+      let result = 0
+      if (sortKey === 'obdobi') result = compareText(a.obdobi_od, b.obdobi_od)
+      if (sortKey === 'osoba') result = compareText(formatPerson(a.osoby), formatPerson(b.osoby))
+      if (sortKey === 'jednotka') result = compareText(a.jednotky?.cislo_jednotky ?? '', b.jednotky?.cislo_jednotky ?? '')
+      if (sortKey === 'vysledek') result = signedAmount(a) - signedAmount(b)
+      if (sortKey === 'zalohy') result = (a.predepsana_zaloha ?? 0) - (b.predepsana_zaloha ?? 0)
+      if (sortKey === 'voda') result = (a.odecty_vodomeru[0]?.spotreba ?? 0) - (b.odecty_vodomeru[0]?.spotreba ?? 0)
+      return sortDirection === 'asc' ? result : -result
+    })
+    return sorted
+  }, [sortDirection, sortKey, vyuctovani])
   const readings = sortedRows.flatMap(row => row.odecty_vodomeru)
   const filtrovaneRows = useMemo(() => {
     const query = hledani.trim().toLowerCase()
@@ -161,6 +179,19 @@ export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialE
       })
   }, [jednotky, sortedRows])
 
+  function toggleSort(key: VyuctovaniSortKey) {
+    if (sortKey === key) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+      return
+    }
+    setSortKey(key)
+    setSortDirection('asc')
+  }
+
+  function sortFor(key: VyuctovaniSortKey) {
+    return sortKey === key ? sortDirection : null
+  }
+
   return (
     <PageShell
       title="Vyúčtování"
@@ -169,10 +200,13 @@ export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialE
         { label: 'odečtů', value: readings.length, dot: 'sky', color: 'sky' },
         { label: 'upozornění', value: warningCount, dot: warningCount ? 'amber' : 'emerald', color: warningCount ? 'amber' : 'emerald' },
         ...coverageStats.map(stat => ({
-          label: `rok ${stat.rok}`,
+          label: String(stat.rok),
           value: `${stat.present}/${stat.total}`,
           dot: stat.missing.length === 0 ? 'emerald' as const : 'amber' as const,
           color: stat.missing.length === 0 ? 'emerald' as const : 'amber' as const,
+          title: stat.missing.length === 0
+            ? `Rok ${stat.rok}: evidované všechny jednotky`
+            : `Rok ${stat.rok}: chybí jednotky ${stat.missing.join(', ')}`,
         })),
       ]}
       actions={
@@ -207,42 +241,15 @@ export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialE
           </div>
         )}
 
-        {coverageStats.length > 0 && (
-          <section className="flex flex-wrap gap-2">
-            {coverageStats.map(stat => (
-              <div key={stat.rok} className="relative group">
-                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${
-                  stat.missing.length === 0
-                    ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
-                    : 'bg-amber-50 text-amber-800 ring-amber-200'
-                }`}>
-                  <span>{stat.rok}</span>
-                  <span>{stat.present}/{stat.total} jednotek</span>
-                </div>
-                <div className="pointer-events-none absolute left-0 top-9 z-30 hidden w-72 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600 shadow-xl group-hover:block">
-                  {stat.missing.length === 0 ? (
-                    <p className="font-semibold text-emerald-700">Pro rok {stat.rok} jsou evidované všechny jednotky.</p>
-                  ) : (
-                    <>
-                      <p className="font-black text-zinc-950">Chybí jednotky pro rok {stat.rok}</p>
-                      <p className="mt-2 leading-5 text-zinc-500">{stat.missing.join(', ')}</p>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </section>
-        )}
-
         <section className="rounded-lg border border-zinc-200 overflow-hidden">
           <PageTable>
             <PageThead>
-              <PageTh>Období</PageTh>
-              <PageTh>Osoba</PageTh>
-              <PageTh>Jednotka</PageTh>
-              <PageTh>Výsledek</PageTh>
-              <PageTh>Zálohy</PageTh>
-              <PageTh>Voda</PageTh>
+              <PageTh sortDirection={sortFor('obdobi')} onSort={() => toggleSort('obdobi')}>Období</PageTh>
+              <PageTh sortDirection={sortFor('osoba')} onSort={() => toggleSort('osoba')}>Osoba</PageTh>
+              <PageTh sortDirection={sortFor('jednotka')} onSort={() => toggleSort('jednotka')}>Jednotka</PageTh>
+              <PageTh sortDirection={sortFor('vysledek')} onSort={() => toggleSort('vysledek')}>Výsledek</PageTh>
+              <PageTh sortDirection={sortFor('zalohy')} onSort={() => toggleSort('zalohy')}>Zálohy</PageTh>
+              <PageTh sortDirection={sortFor('voda')} onSort={() => toggleSort('voda')}>Voda</PageTh>
               <PageTh>Porovnání</PageTh>
             </PageThead>
             <PageTbody>

@@ -8,6 +8,7 @@ type StatPill = {
   dot?: 'emerald' | 'amber' | 'sky' | 'zinc'
   color?: 'emerald' | 'amber' | 'sky' | 'zinc'
   active?: boolean
+  title?: string
   onClick?: () => void
 }
 
@@ -63,11 +64,11 @@ export default function PageShell({ title, stats, actions, children }: PageShell
                   s.active ? 'ring-2 ring-emerald-500 ring-offset-1 shadow-sm' : ''
                 } ${PILL_COLORS[s.color ?? 'zinc']}`
                 return s.onClick ? (
-                  <button key={i} type="button" onClick={s.onClick} className={`${className} hover:-translate-y-0.5 hover:shadow-sm hover:ring-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1`}>
+                  <button key={i} type="button" onClick={s.onClick} title={s.title} className={`${className} hover:-translate-y-0.5 hover:shadow-sm hover:ring-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-1`}>
                     {content}
                   </button>
                 ) : (
-                  <span key={i} className={className}>
+                  <span key={i} title={s.title} className={className}>
                     {content}
                   </span>
                 )
