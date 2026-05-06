@@ -155,12 +155,13 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
             <div className="mt-3 grid gap-3 text-sm">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">1. Kontrolní náhled</p>
-                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani -- &quot;C:\cesta\k\pdf-nebo-slozce&quot;</code>
+                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani</code>
               </div>
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.08em] text-zinc-400">2. Uložení do DB</p>
-                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani -- &quot;C:\cesta\k\pdf-nebo-slozce&quot; --save</code>
+                <code className="mt-1 block rounded-lg bg-zinc-950 px-3 py-2 text-xs text-white">npm run import:vyuctovani -- --save</code>
               </div>
+              <p className="text-xs text-zinc-500">Výchozí složka: D:\07. Aplikace\SVJ Spojovací 557\vyúčtování</p>
             </div>
           </div>
         </section>

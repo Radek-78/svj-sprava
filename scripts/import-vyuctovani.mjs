@@ -3,6 +3,8 @@ import { PDFParse } from 'pdf-parse'
 import fs from 'node:fs'
 import path from 'node:path'
 
+const DEFAULT_IMPORT_PATH = 'D:\\07. Aplikace\\SVJ Spojovací 557\\vyúčtování'
+
 function loadEnv(filePath) {
   if (!fs.existsSync(filePath)) return
   for (const line of fs.readFileSync(filePath, 'utf8').split(/\r?\n/)) {
@@ -214,13 +216,8 @@ async function main() {
   configurePdfWorker()
 
   const args = process.argv.slice(2)
-  const target = args.find(arg => !arg.startsWith('--'))
+  const target = args.find(arg => !arg.startsWith('--')) ?? DEFAULT_IMPORT_PATH
   const save = args.includes('--save')
-  if (!target) {
-    console.log('Použití: npm run import:vyuctovani -- "C:\\cesta\\k\\pdf-nebo-slozce" [--save]')
-    console.log('Bez --save se provede jen kontrolní náhled.')
-    process.exit(1)
-  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
