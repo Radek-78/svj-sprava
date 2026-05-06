@@ -24,42 +24,48 @@ function personScore(person: OsobaRow, sourceName: string | null) {
 }
 
 export async function POST(request: NextRequest) {
-  const formData = await request.formData()
-  const files = formData.getAll('files').filter((item): item is File => item instanceof File)
+  try {
+    const formData = await request.formData()
+    const files = formData.getAll('files').filter((item): item is File => item instanceof File)
 
-  if (files.length === 0) {
-    return NextResponse.json({ error: 'Nebyl nahrán žádný PDF soubor.' }, { status: 400 })
+    if (files.length === 0) {
+      return NextResponse.json({ error: 'Nebyl nahrán žádný PDF soubor.' }, { status: 400 })
+    }
+
+    const supabase = await createClient()
+    const [{ data: osoby }, { data: jednotky }] = await Promise.all([
+      supabase.from('osoby').select('id, jmeno, prijmeni, email'),
+      supabase.from('jednotky').select('id, cislo_jednotky, vchod, ulice_vchodu').order('cislo_jednotky'),
+    ])
+
+    const results = []
+    for (const file of files) {
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const parsed = await parseVyuctovaniPdf(buffer, file.name)
+      const jednotkaCandidates = (jednotky ?? []).filter(j => j.cislo_jednotky === parsed.cisloJednotky)
+      const osobaCandidates = (osoby ?? [])
+        .map(osoba => ({ ...osoba, score: personScore(osoba, parsed.uzivatelText) }))
+        .filter(osoba => osoba.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5)
+
+      results.push({
+        clientId: crypto.randomUUID(),
+        parsed: {
+          ...parsed,
+          rawText: undefined,
+        },
+        jednotkaCandidates,
+        osobaCandidates,
+        selectedJednotkaId: jednotkaCandidates.length === 1 ? jednotkaCandidates[0].id : null,
+        selectedOsobaId: osobaCandidates[0]?.score >= 70 ? osobaCandidates[0].id : null,
+      })
+    }
+
+    return NextResponse.json({ results })
+  } catch (error) {
+    console.error('Vyuctovani preview failed', error)
+    const message = error instanceof Error ? error.message : 'Import PDF se nepodařil.'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
-
-  const supabase = await createClient()
-  const [{ data: osoby }, { data: jednotky }] = await Promise.all([
-    supabase.from('osoby').select('id, jmeno, prijmeni, email'),
-    supabase.from('jednotky').select('id, cislo_jednotky, vchod, ulice_vchodu').order('cislo_jednotky'),
-  ])
-
-  const results = []
-  for (const file of files) {
-    const buffer = Buffer.from(await file.arrayBuffer())
-    const parsed = await parseVyuctovaniPdf(buffer, file.name)
-    const jednotkaCandidates = (jednotky ?? []).filter(j => j.cislo_jednotky === parsed.cisloJednotky)
-    const osobaCandidates = (osoby ?? [])
-      .map(osoba => ({ ...osoba, score: personScore(osoba, parsed.uzivatelText) }))
-      .filter(osoba => osoba.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
-
-    results.push({
-      clientId: crypto.randomUUID(),
-      parsed: {
-        ...parsed,
-        rawText: undefined,
-      },
-      jednotkaCandidates,
-      osobaCandidates,
-      selectedJednotkaId: jednotkaCandidates.length === 1 ? jednotkaCandidates[0].id : null,
-      selectedOsobaId: osobaCandidates[0]?.score >= 70 ? osobaCandidates[0].id : null,
-    })
-  }
-
-  return NextResponse.json({ results })
 }

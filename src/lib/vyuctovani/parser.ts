@@ -1,4 +1,6 @@
 import { PDFParse } from 'pdf-parse'
+import fs from 'node:fs'
+import path from 'node:path'
 
 export type VyuctovaniTypVysledku = 'preplatek' | 'nedoplatek' | 'nula'
 
@@ -33,6 +35,10 @@ export type ParsedVyuctovani = {
   warnings: string[]
   rawText: string
 }
+
+const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs')
+const workerSource = fs.readFileSync(workerPath, 'utf8')
+PDFParse.setWorker(`data:text/javascript;base64,${Buffer.from(workerSource).toString('base64')}`)
 
 const DATE_RE = /(\d{1,2})\.(\d{1,2})\.(\d{4})/
 
@@ -80,15 +86,15 @@ function parseResult(text: string) {
 }
 
 function parseTotals(text: string) {
-  const celkemLine = text.match(/Celkem\s+(?:Nedoplatek[^\n]*\s+)?([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})/i)
+  const celkemBlock = text.match(/Celkem[\s\S]{0,260}?([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})\s+([+-]?\d[\d\s]*[,.]\d{2})/i)
   const celkovyPredpis = firstMatch(text, /Celkov[áa]\s+v[ýy]še\s+p[řr]edpisu\s+činila:\s*([+-]?\d[\d\s]*[,.]\d{2})\s*Kč/i)
   const nevyuctovatelne = firstMatch(text, /Za\s+nevy[úu]čtovateln[ée]\s+položky\s+p[řr]edeps[áa]no:\s*([+-]?\d[\d\s]*[,.]\d{2})\s*Kč/i)
   const prispevek = firstMatch(text, /p[řr][íi]sp[ěe]v[eě]k\s+na\s+spr[áa]vu\s+domu\s+a\s+pozemku:\s*([+-]?\d[\d\s]*[,.]\d{2})\s*Kč/i)
 
   return {
-    zaplacenaZaloha: parseCzechNumber(celkemLine?.[1]),
-    predepsanaZaloha: parseCzechNumber(celkemLine?.[2]),
-    nakladCelkem: parseCzechNumber(celkemLine?.[3]),
+    zaplacenaZaloha: parseCzechNumber(celkemBlock?.[1]),
+    predepsanaZaloha: parseCzechNumber(celkemBlock?.[2]),
+    nakladCelkem: parseCzechNumber(celkemBlock?.[3]),
     celkovyPredpis: parseCzechNumber(celkovyPredpis),
     nevyuctovatelnePredpis: parseCzechNumber(nevyuctovatelne),
     prispevekSpravaDomu: parseCzechNumber(prispevek),

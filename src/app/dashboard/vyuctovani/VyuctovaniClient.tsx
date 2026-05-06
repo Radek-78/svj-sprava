@@ -65,6 +65,16 @@ type PreviewItem = {
 const moneyFormatter = new Intl.NumberFormat('cs-CZ', { style: 'currency', currency: 'CZK', maximumFractionDigits: 0 })
 const numberFormatter = new Intl.NumberFormat('cs-CZ', { maximumFractionDigits: 2 })
 
+async function readApiResponse(response: Response) {
+  const text = await response.text()
+  if (!text) return {}
+  try {
+    return JSON.parse(text)
+  } catch {
+    return { error: text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() || 'Server vrátil nečitelnou odpověď.' }
+  }
+}
+
 function formatPerson(person: Person | PreviewCandidate | null) {
   if (!person) return 'Neznámá osoba'
   return [person.prijmeni, person.jmeno].filter(Boolean).join(' ')
@@ -160,7 +170,7 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
     const formData = new FormData()
     Array.from(files).forEach(file => formData.append('files', file))
     const response = await fetch('/api/import/vyuctovani/preview', { method: 'POST', body: formData })
-    const data = await response.json()
+    const data = await readApiResponse(response)
     setUploading(false)
     if (!response.ok) {
       setMessage(data.error ?? 'Import se nepodařilo načíst.')
@@ -192,7 +202,7 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError }: { 
         })),
       }),
     })
-    const data = await response.json()
+    const data = await readApiResponse(response)
     setSaving(false)
     if (!response.ok) {
       setMessage(data.error ?? 'Uložení se nepodařilo.')
