@@ -36,9 +36,18 @@ export type ParsedVyuctovani = {
   rawText: string
 }
 
-const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs')
-const workerSource = fs.readFileSync(workerPath, 'utf8')
-PDFParse.setWorker(`data:text/javascript;base64,${Buffer.from(workerSource).toString('base64')}`)
+let workerConfigured = false
+
+function configurePdfWorker() {
+  if (workerConfigured) return
+  const workerPath = path.join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.worker.min.mjs')
+  if (!fs.existsSync(workerPath)) {
+    throw new Error('PDF worker nebyl nalezen v serverovém balíčku.')
+  }
+  const workerSource = fs.readFileSync(workerPath, 'utf8')
+  PDFParse.setWorker(`data:text/javascript;base64,${Buffer.from(workerSource).toString('base64')}`)
+  workerConfigured = true
+}
 
 const DATE_RE = /(\d{1,2})\.(\d{1,2})\.(\d{4})/
 
@@ -128,6 +137,7 @@ function parseWaterMeters(text: string): ParsedVodomer[] {
 }
 
 export async function parseVyuctovaniPdf(buffer: Buffer, fileName: string): Promise<ParsedVyuctovani> {
+  configurePdfWorker()
   const parser = new PDFParse({ data: buffer })
   const pdf = await parser.getText()
   const rawText = pdf.text

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist'],
+  outputFileTracingIncludes: {
+    '/api/import/vyuctovani/preview': ['./node_modules/pdfjs-dist/legacy/build/pdf.worker.min.mjs'],
+  },
 };
 
 export default nextConfig;
