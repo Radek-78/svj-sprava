@@ -6,6 +6,7 @@ import PageShell, { PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead, 
 
 type Person = { id: string; jmeno: string | null; prijmeni: string; email: string | null }
 type Unit = { id: string; cislo_jednotky: string; vchod: string | null; ulice_vchodu: string | null }
+type UnitMinimal = { id: string; cislo_jednotky: string }
 type MeterReading = {
   id: string
   cislo_merice: string
@@ -112,7 +113,7 @@ function settlementWarning(row: Settlement, allRows: Settlement[]) {
   return null
 }
 
-export default function VyuctovaniClient({ initialVyuctovani, initialError, openId }: { initialVyuctovani: Settlement[]; initialError: string | null; openId?: string }) {
+export default function VyuctovaniClient({ initialVyuctovani, jednotky, initialError, openId }: { initialVyuctovani: Settlement[]; jednotky: UnitMinimal[]; initialError: string | null; openId?: string }) {
   const router = useRouter()
   const [vyuctovani] = useState(initialVyuctovani)
   const [hledani, setHledani] = useState('')
@@ -145,6 +146,20 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError, open
     const water = row.odecty_vodomeru.some(reading => waterWarning(reading, row, sortedRows)) ? 1 : 0
     return count + settlement + water
   }, 0)
+  const coverageStats = useMemo(() => {
+    const units = [...jednotky].sort((a, b) => a.cislo_jednotky.localeCompare(b.cislo_jednotky, 'cs', { numeric: true }))
+    const byYear = new Map<number, Set<string>>()
+    for (const row of sortedRows) {
+      if (!byYear.has(row.rok)) byYear.set(row.rok, new Set())
+      byYear.get(row.rok)?.add(row.jednotka_id)
+    }
+    return [...byYear.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([rok, present]) => {
+        const missing = units.filter(unit => !present.has(unit.id)).map(unit => unit.cislo_jednotky)
+        return { rok, present: present.size, total: units.length, missing }
+      })
+  }, [jednotky, sortedRows])
 
   return (
     <PageShell
@@ -153,6 +168,12 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError, open
         { label: 'záznamů', value: sortedRows.length },
         { label: 'odečtů', value: readings.length, dot: 'sky', color: 'sky' },
         { label: 'upozornění', value: warningCount, dot: warningCount ? 'amber' : 'emerald', color: warningCount ? 'amber' : 'emerald' },
+        ...coverageStats.map(stat => ({
+          label: `rok ${stat.rok}`,
+          value: `${stat.present}/${stat.total}`,
+          dot: stat.missing.length === 0 ? 'emerald' as const : 'amber' as const,
+          color: stat.missing.length === 0 ? 'emerald' as const : 'amber' as const,
+        })),
       ]}
       actions={
         <>
@@ -184,6 +205,33 @@ export default function VyuctovaniClient({ initialVyuctovani, initialError, open
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
             {message}
           </div>
+        )}
+
+        {coverageStats.length > 0 && (
+          <section className="flex flex-wrap gap-2">
+            {coverageStats.map(stat => (
+              <div key={stat.rok} className="relative group">
+                <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ring-1 ${
+                  stat.missing.length === 0
+                    ? 'bg-emerald-50 text-emerald-800 ring-emerald-200'
+                    : 'bg-amber-50 text-amber-800 ring-amber-200'
+                }`}>
+                  <span>{stat.rok}</span>
+                  <span>{stat.present}/{stat.total} jednotek</span>
+                </div>
+                <div className="pointer-events-none absolute left-0 top-9 z-30 hidden w-72 rounded-lg border border-zinc-200 bg-white p-3 text-xs text-zinc-600 shadow-xl group-hover:block">
+                  {stat.missing.length === 0 ? (
+                    <p className="font-semibold text-emerald-700">Pro rok {stat.rok} jsou evidované všechny jednotky.</p>
+                  ) : (
+                    <>
+                      <p className="font-black text-zinc-950">Chybí jednotky pro rok {stat.rok}</p>
+                      <p className="mt-2 leading-5 text-zinc-500">{stat.missing.join(', ')}</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </section>
         )}
 
         <section className="rounded-lg border border-zinc-200 overflow-hidden">

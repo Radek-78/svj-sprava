@@ -1039,38 +1039,34 @@ export default function JednotkyClient({ jednotky: initial, openId }: { jednotky
                           {(vybrana.odecty_vodomeru || []).length === 0 ? (
                             <p className="text-sm text-zinc-400 italic">Žádné odečty vody.</p>
                           ) : (
-                            <div className="space-y-2">
+                            <div className="overflow-hidden rounded-xl border border-zinc-200">
                               {[...(vybrana.odecty_vodomeru || [])]
                                 .sort((a, b) => (a.datum_od ?? '').localeCompare(b.datum_od ?? ''))
                                 .map(o => (
-                                  <div key={o.id} className="rounded-xl border border-sky-100 bg-sky-50/60 p-3">
-                                    <div className="flex items-start justify-between gap-3">
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-black text-sky-700 ring-1 ring-sky-100">{o.typ}</span>
-                                          <span className="text-xs font-black text-zinc-900">{o.cislo_merice}</span>
-                                        </div>
-                                        <p className="mt-1 text-[10px] text-zinc-400">{o.datum_od ?? '—'} až {o.datum_do ?? '—'}</p>
-                                      </div>
-                                      <span className="text-sm font-black text-sky-800">{formatNumber(o.spotreba, ' m3')}</span>
+                                  <div key={o.id} className="grid grid-cols-[72px_1fr_92px_92px_92px] items-center gap-3 border-b border-zinc-100 bg-white px-3 py-2.5 last:border-0 hover:bg-sky-50/50">
+                                    <div>
+                                      <p className="text-lg font-black leading-none text-zinc-950">{o.vyuctovani_sluzeb?.rok ?? '—'}</p>
+                                      <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-sky-700">{o.typ}</p>
                                     </div>
-                                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                                      <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Počátek</p>
-                                        <p className="font-semibold text-zinc-800">{formatNumber(o.pocatecni_stav)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Konec</p>
-                                        <p className="font-semibold text-zinc-800">{formatNumber(o.koncovy_stav)}</p>
-                                      </div>
-                                      <div>
-                                        <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Vyúčtování</p>
-                                        <p className="font-semibold text-zinc-800">{o.vyuctovani_sluzeb?.rok ?? '—'}</p>
-                                      </div>
+                                    <div className="min-w-0">
+                                      <p className="truncate text-xs font-black text-zinc-900">{o.cislo_merice}</p>
+                                      <p className="mt-0.5 truncate text-[10px] text-zinc-400">{o.datum_od ?? '—'} až {o.datum_do ?? '—'}</p>
+                                      {o.vyuctovani_sluzeb?.osoby && (
+                                        <p className="mt-0.5 truncate text-[10px] text-zinc-500">{formatJmeno(o.vyuctovani_sluzeb.osoby)}</p>
+                                      )}
                                     </div>
-                                    {o.vyuctovani_sluzeb?.osoby && (
-                                      <p className="mt-2 text-[10px] text-zinc-500">V rámci vyúčtování: {formatJmeno(o.vyuctovani_sluzeb.osoby)}</p>
-                                    )}
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Počátek</p>
+                                      <p className="text-xs font-semibold text-zinc-800">{formatNumber(o.pocatecni_stav)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Konec</p>
+                                      <p className="text-xs font-semibold text-zinc-800">{formatNumber(o.koncovy_stav)}</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <p className="text-[10px] font-bold uppercase tracking-wide text-zinc-400">Spotřeba</p>
+                                      <p className="text-sm font-black text-sky-800">{formatNumber(o.spotreba, ' m3')}</p>
+                                    </div>
                                   </div>
                                 ))}
                             </div>
