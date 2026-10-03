@@ -43,6 +43,15 @@ const navLinks = [
     ),
   },
   {
+    href: '/dashboard/katastr',
+    label: 'Katastr',
+    icon: (
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75L3.75 9v10.5L9 17.25m0-10.5l6 2.25m-6-2.25v10.5m6-8.25L20.25 6v10.5L15 19.5m0-10.5v10.5" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard/cipy',
     label: 'Čipy',
     icon: (
