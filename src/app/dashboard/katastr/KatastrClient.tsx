@@ -93,6 +93,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
 
   const [text, setText] = useState('')
   const [poznamka, setPoznamka] = useState('')
+  const [vlozenoAt, setVlozenoAt] = useState<Date | null>(null)
   const [ukladam, setUkladam] = useState(false)
   const [zprava, setZprava] = useState<string | null>(initialError ? `Výpisy se nepodařilo načíst: ${initialError}` : null)
 
@@ -111,6 +112,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
     setUkladam(true)
     setZprava(null)
     const { error } = await supabase.from('katastr_vypisy').insert({
+      created_at: (vlozenoAt ?? new Date()).toISOString(),
       poznamka: poznamka.trim() || null,
       raw_text: text,
       zaznamy: parsed.zaznamy,
@@ -122,6 +124,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
       return
     }
     setText('')
+    setVlozenoAt(null)
     setPoznamka('')
     setZprava('Výpis byl uložen.')
     router.refresh()
@@ -145,7 +148,14 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
           </p>
           <textarea
             value={text}
-            onChange={e => { setText(e.target.value); setZprava(null) }}
+            onChange={e => {
+              const novy = e.target.value
+              // Čas vložení = okamžik, kdy se pole z prázdného stalo vyplněným.
+              if (!novy.trim()) setVlozenoAt(null)
+              else if (!vlozenoAt) setVlozenoAt(new Date())
+              setText(novy)
+              setZprava(null)
+            }}
             rows={8}
             placeholder={'SJ Novák Jan a Nováková Jana, Spojovací 557, Mladá, 28924 Milovice\nJednotka: 557/312\t59/2500'}
             className="w-full rounded-xl border border-zinc-200 p-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500"
@@ -183,7 +193,12 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
               <p className="text-xs text-zinc-500">Zatím není uložen žádný výpis, není s čím porovnávat.</p>
             )}
 
-            <div className="flex flex-wrap items-center gap-3 pt-2">
+            {vlozenoAt && (
+              <p className="text-xs text-zinc-500 pt-2">
+                Výpis bude uložen s datem a časem vložení: <span className="font-semibold text-zinc-800">{dateFormatter.format(vlozenoAt)}</span>
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 value={poznamka}
                 onChange={e => setPoznamka(e.target.value)}
@@ -196,7 +211,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
                 disabled={ukladam}
                 className="px-3.5 py-2 rounded-xl bg-zinc-950 text-white text-sm font-bold hover:bg-zinc-800 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
               >
-                {ukladam ? 'Ukládám…' : 'Uložit tento výpis'}
+                {ukladam ? 'Ukládám…' : vlozenoAt ? `Uložit výpis z ${dateFormatter.format(vlozenoAt)}` : 'Uložit tento výpis'}
               </button>
             </div>
           </section>
