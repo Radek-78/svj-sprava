@@ -27,3 +27,8 @@ create policy "Přihlášení uživatelé zapisují výpisy z katastru"
   to authenticated
   using (true)
   with check (true);
+
+-- Rozdíly oproti evidenci v okamžiku uložení výpisu (doplněno dodatečně).
+alter table public.katastr_vypisy add column if not exists rozdily jsonb;
+
+notify pgrst, 'reload schema';

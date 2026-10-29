@@ -14,7 +14,7 @@ export default async function KatastrPage() {
       .order('cislo_jednotky'),
     supabase
       .from('katastr_vypisy')
-      .select('id, created_at, poznamka, pocet_zaznamu, zaznamy')
+      .select('id, created_at, poznamka, pocet_zaznamu, zaznamy, rozdily')
       .order('created_at', { ascending: false })
       .limit(20),
   ])

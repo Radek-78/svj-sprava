@@ -28,6 +28,7 @@ type VypisDb = {
   poznamka: string | null
   pocet_zaznamu: number
   zaznamy: KatastrZaznam[]
+  rozdily: Rozdil[] | null // rozdíly proti evidenci v době uložení (u starších výpisů null)
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -117,6 +118,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
       poznamka: poznamka.trim() || null,
       raw_text: text,
       zaznamy: parsed.zaznamy,
+      rozdily: proti_evidenci?.rozdily ?? [],
       pocet_zaznamu: parsed.zaznamy.length,
     })
     setUkladam(false)
@@ -243,34 +245,64 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
                       <PageTd>{v.poznamka ?? '—'}</PageTd>
                       <PageTd>{otevrenyVypis === v.id ? 'Skrýt ▲' : 'Zobrazit ▼'}</PageTd>
                     </tr>
-                    {otevrenyVypis === v.id && (
-                      <tr>
-                        <td colSpan={4} className="p-0 bg-zinc-50">
-                          <PageTable>
-                            <PageThead>
-                              <PageTh>Jednotka</PageTh>
-                              <PageTh>Vlastníci</PageTh>
-                              <PageTh>Typ</PageTh>
-                              <PageTh>Podíl</PageTh>
-                              <PageTh>Adresa</PageTh>
-                            </PageThead>
-                            <PageTbody>
-                              {[...v.zaznamy]
-                                .sort((a, b) => a.jednotka.localeCompare(b.jednotka, 'cs', { numeric: true }))
-                                .map((z, i) => (
-                                  <tr key={`${z.jednotka}-${i}`} className="border-b border-zinc-100">
-                                    <PageTd className="font-semibold text-zinc-900">{z.jednotka}</PageTd>
-                                    <PageTd>{z.vlastnici.join(', ')}</PageTd>
-                                    <PageTd>{z.typ.toUpperCase()}</PageTd>
-                                    <PageTd>{z.podilCitatel && z.podilJmenovatel ? `${z.podilCitatel}/${z.podilJmenovatel}` : '—'}</PageTd>
-                                    <PageTd>{z.adresa || '—'}</PageTd>
-                                  </tr>
-                                ))}
-                            </PageTbody>
-                          </PageTable>
-                        </td>
-                      </tr>
-                    )}
+                    {otevrenyVypis === v.id && (() => {
+                      const zeStareho = v.rozdily === null
+                      const rozdilyVypisu = v.rozdily ?? porovnej(v.zaznamy, evidence).rozdily
+                      const podleJednotky = new Map<string, Rozdil[]>()
+                      for (const r of rozdilyVypisu) podleJednotky.set(r.jednotka, [...(podleJednotky.get(r.jednotka) ?? []), r])
+                      const chybejici = rozdilyVypisu.filter(r => r.typ === 'chybi_ve_vypisu')
+                      return (
+                        <tr>
+                          <td colSpan={4} className="p-0 bg-zinc-50">
+                            <p className="px-6 py-3 text-xs text-zinc-600 border-b border-zinc-200">
+                              {zeStareho
+                                ? 'Rozdíly nebyly při uložení zaznamenány, jsou porovnány s dnešní evidencí.'
+                                : 'Rozdíly oproti evidenci v době uložení výpisu.'}{' '}
+                              <span className="font-semibold">{rozdilyVypisu.length === 0 ? 'Žádné rozdíly.' : `Rozdílů: ${rozdilyVypisu.length}.`}</span>
+                            </p>
+                            {chybejici.length > 0 && (
+                              <p className="px-6 py-2 text-xs text-amber-800 bg-amber-50 border-b border-amber-200">
+                                Chybělo ve výpisu: {chybejici.map(r => `${r.jednotka} (${r.puvodne})`).join('; ')}
+                              </p>
+                            )}
+                            <PageTable>
+                              <PageThead>
+                                <PageTh>Jednotka</PageTh>
+                                <PageTh>Vlastníci</PageTh>
+                                <PageTh>Typ</PageTh>
+                                <PageTh>Podíl</PageTh>
+                                <PageTh>Adresa</PageTh>
+                                <PageTh>Rozdíl oproti evidenci</PageTh>
+                              </PageThead>
+                              <PageTbody>
+                                {[...v.zaznamy]
+                                  .sort((x, y) => x.jednotka.localeCompare(y.jednotka, 'cs', { numeric: true }))
+                                  .map((z, i) => {
+                                    const rr = podleJednotky.get(z.jednotka) ?? []
+                                    return (
+                                      <tr key={`${z.jednotka}-${i}`} className={`border-b border-zinc-100 ${rr.length ? 'bg-amber-50' : ''}`}>
+                                        <PageTd className="font-semibold text-zinc-900">{z.jednotka}</PageTd>
+                                        <PageTd>{z.vlastnici.join(', ')}</PageTd>
+                                        <PageTd>{z.typ.toUpperCase()}</PageTd>
+                                        <PageTd>{z.podilCitatel && z.podilJmenovatel ? `${z.podilCitatel}/${z.podilJmenovatel}` : '—'}</PageTd>
+                                        <PageTd>{z.adresa || '—'}</PageTd>
+                                        <PageTd>
+                                          {rr.map((r, k) => (
+                                            <div key={k} className="mb-1 last:mb-0">
+                                              <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-semibold ring-1 ${ROZDIL_BARVY[r.typ]}`}>{r.popis}</span>
+                                              <span className="ml-2 text-xs text-zinc-500">v evidenci: {r.puvodne}</span>
+                                            </div>
+                                          ))}
+                                        </PageTd>
+                                      </tr>
+                                    )
+                                  })}
+                              </PageTbody>
+                            </PageTable>
+                          </td>
+                        </tr>
+                      )
+                    })()}
                   </Fragment>
                 ))}
               </PageTbody>
