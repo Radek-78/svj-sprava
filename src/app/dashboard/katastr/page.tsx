@@ -9,7 +9,7 @@ export default async function KatastrPage() {
       .from('jednotky')
       .select(`
         id, cislo_jednotky, podil_citatel, podil_jmenovatel,
-        jednotky_osoby(role, typ_vlastnictvi, je_aktivni, osoby(jmeno, prijmeni))
+        jednotky_osoby(role, typ_vlastnictvi, je_aktivni, osoby(jmeno, prijmeni, titul))
       `)
       .order('cislo_jednotky'),
     supabase

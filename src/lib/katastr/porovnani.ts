@@ -36,8 +36,9 @@ export function klicOsoby(jmeno: string): string {
   return bezDiakritiky(jmeno)
     .toLowerCase()
     .split(/\s+/)
-    .map(t => t.replace(/[.,]+$/, ''))
-    .filter(t => t && !TITULY.test(t) && !t.includes('.'))
+    .filter(t => !t.includes('.')) // tituly s tečkou: MgA., Ph.D., Bc.
+    .map(t => t.replace(/,+$/, ''))
+    .filter(t => t && !TITULY.test(t))
     .sort()
     .join(' ')
 }

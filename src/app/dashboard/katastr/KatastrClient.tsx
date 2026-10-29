@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import PageShell, { PageEmpty, PageTable, PageTbody, PageTd, PageTh, PageThead } from '@/components/PageShell'
@@ -18,7 +18,7 @@ type JednotkaDb = {
     role: string
     typ_vlastnictvi: TypVlastnictvi | null
     je_aktivni: boolean
-    osoby: { jmeno: string | null; prijmeni: string } | null
+    osoby: { jmeno: string | null; prijmeni: string; titul: string | null } | null
   }[]
 }
 
@@ -47,7 +47,7 @@ function evidenceZDb(jednotky: JednotkaDb[]): EvidenceJednotka[] {
     const vlastnici = j.jednotky_osoby.filter(v => v.role === 'vlastnik' && v.je_aktivni && v.osoby)
     return {
       jednotka: j.cislo_jednotky,
-      vlastnici: vlastnici.map(v => [v.osoby!.prijmeni, v.osoby!.jmeno].filter(Boolean).join(' ')),
+      vlastnici: vlastnici.map(v => [v.osoby!.prijmeni, v.osoby!.jmeno, v.osoby!.titul].filter(Boolean).join(' ')),
       typ: vlastnici[0]?.typ_vlastnictvi ?? (vlastnici.length ? 'individualni' : null),
       podilCitatel: j.podil_citatel,
       podilJmenovatel: j.podil_jmenovatel,
@@ -94,6 +94,7 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
   const [text, setText] = useState('')
   const [poznamka, setPoznamka] = useState('')
   const [vlozenoAt, setVlozenoAt] = useState<Date | null>(null)
+  const [otevrenyVypis, setOtevrenyVypis] = useState<string | null>(null)
   const [ukladam, setUkladam] = useState(false)
   const [zprava, setZprava] = useState<string | null>(initialError ? `Výpisy se nepodařilo načíst: ${initialError}` : null)
 
@@ -227,15 +228,50 @@ export default function KatastrClient({ jednotky, vypisy, initialError }: {
                 <PageTh>Datum</PageTh>
                 <PageTh>Záznamů</PageTh>
                 <PageTh>Poznámka</PageTh>
+                <PageTh>Detail</PageTh>
               </PageThead>
               <PageTbody>
                 {vypisy.length === 0 && <PageEmpty text="Zatím nebyl uložen žádný výpis." />}
                 {vypisy.map(v => (
-                  <tr key={v.id} className="border-b border-zinc-100">
-                    <PageTd>{dateFormatter.format(new Date(v.created_at))}</PageTd>
-                    <PageTd>{v.pocet_zaznamu}</PageTd>
-                    <PageTd>{v.poznamka ?? '—'}</PageTd>
-                  </tr>
+                  <Fragment key={v.id}>
+                    <tr
+                      onClick={() => setOtevrenyVypis(otevrenyVypis === v.id ? null : v.id)}
+                      className="border-b border-zinc-100 cursor-pointer hover:bg-emerald-50/70"
+                    >
+                      <PageTd>{dateFormatter.format(new Date(v.created_at))}</PageTd>
+                      <PageTd>{v.pocet_zaznamu}</PageTd>
+                      <PageTd>{v.poznamka ?? '—'}</PageTd>
+                      <PageTd>{otevrenyVypis === v.id ? 'Skrýt ▲' : 'Zobrazit ▼'}</PageTd>
+                    </tr>
+                    {otevrenyVypis === v.id && (
+                      <tr>
+                        <td colSpan={4} className="p-0 bg-zinc-50">
+                          <PageTable>
+                            <PageThead>
+                              <PageTh>Jednotka</PageTh>
+                              <PageTh>Vlastníci</PageTh>
+                              <PageTh>Typ</PageTh>
+                              <PageTh>Podíl</PageTh>
+                              <PageTh>Adresa</PageTh>
+                            </PageThead>
+                            <PageTbody>
+                              {[...v.zaznamy]
+                                .sort((a, b) => a.jednotka.localeCompare(b.jednotka, 'cs', { numeric: true }))
+                                .map((z, i) => (
+                                  <tr key={`${z.jednotka}-${i}`} className="border-b border-zinc-100">
+                                    <PageTd className="font-semibold text-zinc-900">{z.jednotka}</PageTd>
+                                    <PageTd>{z.vlastnici.join(', ')}</PageTd>
+                                    <PageTd>{z.typ.toUpperCase()}</PageTd>
+                                    <PageTd>{z.podilCitatel && z.podilJmenovatel ? `${z.podilCitatel}/${z.podilJmenovatel}` : '—'}</PageTd>
+                                    <PageTd>{z.adresa || '—'}</PageTd>
+                                  </tr>
+                                ))}
+                            </PageTbody>
+                          </PageTable>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </PageTbody>
             </PageTable>
